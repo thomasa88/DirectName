@@ -28,9 +28,6 @@ import sys
 NAME = 'Direct Name'
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-LIB_PATH = os.path.join(os.path.dirname(FILE_DIR), 'thomasa88lib')
-if LIB_PATH not in sys.path:
-    sys.path.append(LIB_PATH)
 
 import thomasa88, thomasa88.events, thomasa88.timeline
 
