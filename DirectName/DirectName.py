@@ -193,14 +193,14 @@ def rename_command_created_handler(args):
     events_manager_.add_handler(cmd.executePreview,
                                 adsk.core.CommandEventHandler,
                                 rename_command_execute_preview_handler)
+
+    events_manager_.add_handler(cmd.destroy,
+                                adsk.core.CommandEventHandler,
+                                rename_command_destroy_handler)
     
     events_manager_.add_handler(cmd.validateInputs,
                                 adsk.core.ValidateInputsEventHandler,
                                 rename_command_validate_inputs_handler)
-    
-    events_manager_.add_handler(cmd.inputChanged,
-                                adsk.core.InputChangedEventHandler,
-                                rename_commmand_input_changed_handler)
 
     inputs = cmd.commandInputs
     #inputs.addTextBoxCommandInput('info', '', 'Press tab to focus on the textbox and press Enter to save.', 1, True)
@@ -218,43 +218,43 @@ def rename_command_execute_handler(args):
     failures = try_rename_objects(inputs)
 
     if failures:
-        # All operations failed. Skip adding an Undo entry.
+        # At least on operation failed
         eventArgs.executeFailed = True
         eventArgs.executeFailedMessage = "{NAME} failed. Failed to rename features:<ul>"
         for input in failures:
             timeline_obj, name_obj, label = rename_objs_[int(input.id)]
             eventArgs.executeFailedMessage += f'<li>"{name_obj.name}" -> "{input.value}"'
         eventArgs.executeFailedMessage += "</ul>"
-    
-    # Update state
-    check_timeline(init=True)
 
 def rename_command_execute_preview_handler(args):
-    #eventArgs = adsk.core.CommandEventArgs.cast(args)
-    pass
+    eventArgs = adsk.core.CommandEventArgs.cast(args)
+
+    failures = try_rename_objects(eventArgs.command.commandInputs)
+    eventArgs.isValidResult = not failures
+
+def rename_command_destroy_handler(args):
+    eventArgs = adsk.core.CommandEventArgs.cast(args)
+
+    # Update state
+    check_timeline(init=True)    
 
 def rename_command_validate_inputs_handler(args):
     eventArgs = adsk.core.ValidateInputsEventArgs.cast(args)
 
-    # We cannot do this in the preview handler, as Fusion will stop
-    # previewing as soon as we indicate invalid input.
-    # Optimization: Track the individual input changes
-    preview_failures = try_rename_objects(eventArgs.inputs)
-    eventArgs.areInputsValid = not bool(preview_failures)
-
-def rename_commmand_input_changed_handler(args):
-    eventArgs = adsk.core.InputChangedEventArgs.cast(args)
-    input = adsk.core.StringValueCommandInput.cast(eventArgs.input)
-    # Funnily enough, an empty textbox will not show the error as
-    # "Fusion 360 will change the color of the text to red to indicate
-    # to the user there is a problem".
-    input.isValueError = bool(try_rename_objects([input]))
+    # Want to do rename_objects as a test in execute preview, but
+    # Fusion stops calling the preview as soon as we set the state
+    # to "invalid". Idea: Unset invalid if user changes an input.
+    for input in eventArgs.inputs:
+        if len(input.value) == 0:
+            eventArgs.areInputsValid = False
+            break
+    else:
+        eventArgs.areInputsValid = True
 
 def try_rename_objects(inputs_list):
     failures = []
 
     for input in inputs_list:
-        #for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
         timeline_obj, name_obj, label = rename_objs_[int(input.id)]
         new_name = input.value
         try:
