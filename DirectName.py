@@ -213,7 +213,7 @@ def rename_command_created_handler(args):
                                 rename_command_validate_inputs_handler)
 
     inputs = cmd.commandInputs
-    #inputs.addTextBoxCommandInput('info', '', 'Press tab to focus on the textbox and press Enter to save.', 1, True)
+    inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
     for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
         inputs.addStringValueInput(str(i), label, name_obj.name)
 
@@ -230,10 +230,9 @@ def rename_command_execute_handler(args):
     if failures:
         # At least on operation failed
         eventArgs.executeFailed = True
-        eventArgs.executeFailedMessage = "{NAME} failed. Failed to rename features:<ul>"
-        for input in failures:
-            timeline_obj, name_obj, label = rename_objs_[int(input.id)]
-            eventArgs.executeFailedMessage += f'<li>"{name_obj.name}" -> "{input.value}"'
+        eventArgs.executeFailedMessage = f"{NAME} failed. Failed to rename features:<ul>"
+        for old_name, new_name in failures:
+            eventArgs.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
         eventArgs.executeFailedMessage += "</ul>"
 
 def rename_command_execute_preview_handler(args):
@@ -255,22 +254,21 @@ def rename_command_validate_inputs_handler(args):
     # Fusion stops calling the preview as soon as we set the state
     # to "invalid". Idea: Unset invalid if user changes an input.
     for input in eventArgs.inputs:
-        if len(input.value) == 0:
-            eventArgs.areInputsValid = False
+        if not input.isReadOnly and len(input.value) == 0:
+            #eventArgs.areInputsValid = False
             break
     else:
         eventArgs.areInputsValid = True
 
-def try_rename_objects(inputs_list):
+def try_rename_objects(inputs):
     failures = []
 
-    for input in inputs_list:
-        timeline_obj, name_obj, label = rename_objs_[int(input.id)]
-        new_name = input.value
+    for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
+        input = inputs.itemById(str(i))
         try:
-            name_obj.name = new_name
+            name_obj.name = input.value
         except RuntimeError as e:
-            failures.append(input)
+            failures.append((name_obj.name, input.value))
             error_info = str(e)
             error_split = error_info.split(' : ', maxsplit=1)
             if len(error_split) == 2:
