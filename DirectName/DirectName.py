@@ -25,6 +25,10 @@ import os
 import re
 import sys
 
+### TODO:
+### sketch feature delete makes our command show
+### Option to name new bodies, views etc?
+
 NAME = 'Direct Name'
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
