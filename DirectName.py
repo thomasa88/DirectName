@@ -26,7 +26,6 @@ import re
 import sys
 
 ### TODO:
-### sketch feature delete makes our command show
 ### Option to name new bodies, views etc?
 
 NAME = 'Direct Name'
@@ -70,7 +69,7 @@ def workspace_activated_handler(args):
 def command_terminated_handler(args):
     eventArgs = adsk.core.ApplicationCommandEventArgs.cast(args)
     
-    #print(eventArgs.commandId, eventArgs.terminationReason)
+    #print("TERM", eventArgs.commandId, eventArgs.terminationReason, app_.activeEditObject.classType())
 
     global need_init_
     if need_init_:
@@ -87,6 +86,13 @@ def command_terminated_handler(args):
 
     if eventArgs.commandId == SET_NAME_CMD_ID:
         # self
+        return
+
+    if app_.activeEditObject.classType() == 'adsk::fusion::Sketch':
+        # Don't activate inside Sketch edit mode, e.g. when the user deletes a line or
+        # runs a Mirror command.
+        # Alternative: Track SketchActivate, SketchStop and UndoCommand (note that
+        # CompletedTerminationReason == Cancel). Or possibly ActivateEnvironmentCommand.
         return
 
     # E.g. when creating a Box, the command will terminate after creating the
