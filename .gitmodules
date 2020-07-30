@@ -1,3 +1,3 @@
 [submodule "DirectName/thomasa88lib"]
-	path = thomasa88lib
+	path = thomasa88lib_DirectName
 	url = https://github.com/thomasa88/fusion360-thomasa88lib.git

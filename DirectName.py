@@ -32,22 +32,27 @@ NAME = 'Direct Name'
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
-if FILE_DIR not in sys.path:
-    sys.path.append(FILE_DIR)
-import thomasa88lib, thomasa88lib.events, thomasa88lib.timeline
+sys.path.append(FILE_DIR)
+# Must import lib as unique name, to avoid collision with other versions
+# loaded by other add-ins
+import thomasa88lib_DirectName as thomasa88lib
+import thomasa88lib_DirectName.events as thomasa88lib_events
+import thomasa88lib_DirectName.timeline as thomasa88lib_timeline
 
 # Force modules to be fresh during development
 import importlib
 importlib.reload(thomasa88lib)
-importlib.reload(thomasa88lib.events)
-importlib.reload(thomasa88lib.timeline)
+importlib.reload(thomasa88lib_events)
+importlib.reload(thomasa88lib_timeline)
+
+sys.path.remove(FILE_DIR)
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 AFTER_COMMAND_TERMINATE_ID = 'thomasa88_instantNameAfterCommandTerminate'
 
 app_ = None
 ui_ = None
-events_manager_ = thomasa88lib.events.EventsManger(NAME)
+events_manager_ = thomasa88lib_events.EventsManger(NAME)
 
 need_init_ = True
 last_flat_timeline_ = None
@@ -110,13 +115,13 @@ def after_terminate_handler(args):
 def check_timeline(init=False):
     global last_flat_timeline_
     print("CHECK", not init)
-    status, timeline = thomasa88lib.timeline.get_timeline()
-    if status != thomasa88lib.timeline.TIMELINE_STATUS_OK:
+    status, timeline = thomasa88lib_timeline.get_timeline()
+    if status != thomasa88lib_timeline.TIMELINE_STATUS_OK:
         return
 
     # User can expand/collapse the timeline groups without us knowing,
     # and it affects the timeline API structure, so get a flat timeline.
-    current_flat_timeline = thomasa88lib.timeline.flatten_timeline(timeline)
+    current_flat_timeline = thomasa88lib_timeline.flatten_timeline(timeline)
 
     if not init:
         # Doing Undo (Ctrl+Z) goes by unnoticed, so we can't rely on length
@@ -162,9 +167,9 @@ def check_timeline(init=False):
                         entity = None
                     if entity:
                         label = thomasa88lib.short_class(timeline_obj.entity).replace('Feature', '')
-                        comp_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
-                        if comp_type != thomasa88lib.timeline.OCCURRENCE_NOT_OCCURRENCE:                      
-                            if comp_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
+                        comp_type = thomasa88lib_timeline.get_occurrence_type(timeline_obj)
+                        if comp_type != thomasa88lib_timeline.OCCURRENCE_NOT_OCCURRENCE:                      
+                            if comp_type == thomasa88lib_timeline.OCCURRENCE_BODIES_COMP:
                                 # Only the "Component from bodies" feature can be renamed
                                 rename_objs_.append((timeline_obj, timeline_obj, label))
                             
