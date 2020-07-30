@@ -231,7 +231,7 @@ def rename_command_execute_handler(args):
     cmd = eventArgs.command
     inputs = cmd.commandInputs
 
-    failures = try_rename_objects(inputs)
+    failures, rename_count = try_rename_objects(inputs)
 
     if failures:
         # At least on operation failed
@@ -240,6 +240,11 @@ def rename_command_execute_handler(args):
         for old_name, new_name in failures:
             eventArgs.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
         eventArgs.executeFailedMessage += "</ul>"
+    elif rename_count == 0:
+        eventArgs.executeFailed = True
+        eventArgs.executeFailedMessage = (f"{NAME}: Nothing to rename<br><br>" +
+                                           "Note: Use ESC to gracefully cancel renaming.")
+
 
 def rename_command_execute_preview_handler(args):
     eventArgs = adsk.core.CommandEventArgs.cast(args)
@@ -268,11 +273,14 @@ def rename_command_validate_inputs_handler(args):
 
 def try_rename_objects(inputs):
     failures = []
+    rename_count = 0
 
     for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
         input = inputs.itemById(str(i))
         try:
-            name_obj.name = input.value
+            if name_obj.name != input.value:
+                name_obj.name = input.value
+                rename_count += 1
         except RuntimeError as e:
             failures.append((name_obj.name, input.value))
             error_info = str(e)
@@ -280,7 +288,7 @@ def try_rename_objects(inputs):
             if len(error_split) == 2:
                 error_info = error_split[1]
     
-    return failures
+    return failures, rename_count
 
 def run(context):
     print("RUN")
