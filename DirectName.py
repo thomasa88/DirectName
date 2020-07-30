@@ -72,6 +72,10 @@ def workspace_activated_handler(args):
     print("NEED INIT")
 
 def command_terminated_handler(args):
+    if ui_.activeWorkspace.id != 'FusionSolidEnvironment':
+        # Only for the Design workspace
+        return
+
     eventArgs = adsk.core.ApplicationCommandEventArgs.cast(args)
     
     #print("TERM", eventArgs.commandId, eventArgs.terminationReason, app_.activeEditObject.classType())
