@@ -186,7 +186,8 @@ def check_timeline(init=False):
                         label = re.sub(r'[0-9].*', '', timeline_obj.name)
                         rename_objs_.append((timeline_obj, timeline_obj, label))
 
-                rename_cmd_def_.execute()
+                if rename_objs_:
+                    rename_cmd_def_.execute()
     
     last_flat_timeline_ = current_flat_timeline
 
