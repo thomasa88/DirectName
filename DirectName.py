@@ -38,6 +38,7 @@ from .thomasa88lib import utils
 from .thomasa88lib import events
 from .thomasa88lib import timeline
 from .thomasa88lib import manifest
+from .thomasa88lib import error
 
 # Force modules to be fresh during development
 import importlib
@@ -45,13 +46,16 @@ importlib.reload(thomasa88lib.utils)
 importlib.reload(thomasa88lib.events)
 importlib.reload(thomasa88lib.timeline)
 importlib.reload(thomasa88lib.manifest)
+importlib.reload(thomasa88lib.error)
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 AFTER_COMMAND_TERMINATE_ID = 'thomasa88_instantNameAfterCommandTerminate'
 
 app_ = None
 ui_ = None
-events_manager_ = thomasa88lib.events.EventsManager(NAME)
+
+error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False)
+events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
 
 need_init_ = True
@@ -299,14 +303,17 @@ def run(context):
     global app_
     global ui_
     global rename_cmd_def_
-    try:
+    with error_catcher_:
         app_ = adsk.core.Application.get()
         ui_ = app_.userInterface
 
         # Make sure an old version of this command is not running and blocking the "add"
-        ui_.terminateActiveCommand()
+        if ui_.activeCommand == SET_NAME_CMD_ID:
+            ui_.terminateActiveCommand()
 
         old_cmd_def = ui_.commandDefinitions.itemById(SET_NAME_CMD_ID)
+        if old_cmd_def:
+            old_cmd_def.deleteMe()
 
         # Use a Command to get a transaction when renaming
         rename_cmd_def_ = ui_.commandDefinitions.addButtonDefinition(SET_NAME_CMD_ID,
@@ -333,18 +340,11 @@ def run(context):
 
         check_timeline(init=True)
 
-    except:
-        if ui_:
-            ui_.messageBox('Copy this message using Ctrl+C.\n\nFailed:\n{}'.format(traceback.format_exc()))
-
 def stop(context):
     print("STOP")
-    try:
+    with error_catcher_:
         events_manager_.clean_up()
 
         cmd_def = ui_.commandDefinitions.itemById(SET_NAME_CMD_ID)
         if cmd_def:
             cmd_def.deleteMe()
-    except:
-        if ui_:
-            ui_.messageBox('Copy this message using Ctrl+C.\n\nFailed:\n{}'.format(traceback.format_exc()))
