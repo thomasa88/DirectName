@@ -5,6 +5,8 @@ A Fusion 360 add-in for naming features directly after creation. After creating 
 ![Screenshot](screenshot.png)
 
 ## Installation
+Download the add-in from the [Releases](https://github.com/thomasa88/DirectName/releases) page.
+
 Drop the files in `%appdata%\Autodesk\Autodesk Fusion 360\API\AddIns` .
 
 Make sure the directory is named `DirectName`, with no suffix.
