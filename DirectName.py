@@ -249,9 +249,13 @@ def rename_command_execute_handler(args):
             eventArgs.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
         eventArgs.executeFailedMessage += "</ul>"
     elif rename_count == 0:
-        eventArgs.executeFailed = True
-        eventArgs.executeFailedMessage = (f"{NAME}: Nothing to rename<br><br>" +
-                                           "Note: Use ESC to gracefully cancel renaming.")
+        #eventArgs.executeFailed = True
+        #eventArgs.executeFailedMessage = (f"{NAME}: Nothing to rename<br><br>" +
+        #                                   "Note: Use ESC to gracefully cancel renaming.")
+        
+        # By triggering another command, we can cancel the transaction without
+        # having to give an error.
+        ui_.commandDefinitions.item('SelectCommand')
 
 
 def rename_command_execute_preview_handler(args):
@@ -317,7 +321,7 @@ def run(context):
 
         # Use a Command to get a transaction when renaming
         rename_cmd_def_ = ui_.commandDefinitions.addButtonDefinition(SET_NAME_CMD_ID,
-                                                                    f'{NAME} {manifest_["version"]}',
+                                                                    f'{NAME} v {manifest_["version"]}',
                                                                     '',
                                                                     './resources/rename_icon')
 
