@@ -73,7 +73,7 @@ def workspace_activated_handler(args):
 
     global need_init_
     need_init_ = True
-    print("NEED INIT")
+    #print("NEED INIT")
 
 def command_terminated_handler(args):
     if ui_.activeWorkspace.id != 'FusionSolidEnvironment':
@@ -122,7 +122,7 @@ def after_terminate_handler(args):
 
 def check_timeline(init=False):
     global last_flat_timeline_
-    print("CHECK", not init)
+    #print("CHECK", not init)
     status, timeline = thomasa88lib.timeline.get_timeline()
     if status != thomasa88lib.timeline.TIMELINE_STATUS_OK:
         return
@@ -297,7 +297,6 @@ def try_rename_objects(inputs):
     return failures, rename_count
 
 def run(context):
-    print("RUN")
     global app_
     global ui_
     global rename_cmd_def_
@@ -339,7 +338,6 @@ def run(context):
         check_timeline(init=True)
 
 def stop(context):
-    print("STOP")
     with error_catcher_:
         events_manager_.clean_up()
 
