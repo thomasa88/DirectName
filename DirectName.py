@@ -239,6 +239,9 @@ def rename_command_execute_handler(args):
     cmd = eventArgs.command
     inputs = cmd.commandInputs
 
+    # No command is recorded to undo history as long as we don't do
+    # anything during the execute.
+
     failures, rename_count = try_rename_objects(inputs)
 
     if failures:
@@ -248,15 +251,6 @@ def rename_command_execute_handler(args):
         for old_name, new_name in failures:
             eventArgs.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
         eventArgs.executeFailedMessage += "</ul>"
-    elif rename_count == 0:
-        #eventArgs.executeFailed = True
-        #eventArgs.executeFailedMessage = (f"{NAME}: Nothing to rename<br><br>" +
-        #                                   "Note: Use ESC to gracefully cancel renaming.")
-        
-        # By triggering another command, we can cancel the transaction without
-        # having to give an error.
-        ui_.commandDefinitions.item('SelectCommand')
-
 
 def rename_command_execute_preview_handler(args):
     eventArgs = adsk.core.CommandEventArgs.cast(args)
