@@ -21,6 +21,14 @@ Press Tab to navigate the inputs and press Enter when done. Press Esc to skip na
 
 The object whose name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360 API limitations.)
 
+## Author
+
+This add-in is created by Thomas Axelsson.
+
+## License
+
+This project is licensed under the terms of the MIT license. See [LICENSE](LICENSE).
+
 ## Changelog
 
 * v 0.2.0
