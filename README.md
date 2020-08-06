@@ -1,4 +1,4 @@
-# DirectName
+# ![](resources/rename_icon/32x32.png)DirectName
 
 A Fusion 360 add-in for naming features and bodies directly after creation. After creating a feature (e.g. *Extrude*) a dialog prompts for names.
 
