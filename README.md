@@ -1,6 +1,6 @@
 # DirectName
 
-A Fusion 360 add-in for naming features directly after creation. After creating a feature (e.g. *Extrude*) a dialog prompts for its name.
+A Fusion 360 add-in for naming features and bodies directly after creation. After creating a feature (e.g. *Extrude*) a dialog prompts for names.
 
 ![Screenshot](screenshot.png)
 
@@ -17,7 +17,14 @@ Press Shift+S in Fusion 360 and go to the *Add-Ins* tab. Then select the add-in 
 
 A naming dialog will be shown automatically when new features are created.
 
+Press Tab to navigate the inputs and press Enter when done. Press Esc to skip naming.
+
+The object whose name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360 API limitations.)
+
 ## Changelog
 
-* v0.1.3
+* v 0.2.0
+  * Rename new bodies and surfaces
+  * Highlight active entity when name is edited
+* v 0.1.3
   * Change to MIT license, for app store compatibility
