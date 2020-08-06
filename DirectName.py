@@ -53,8 +53,17 @@ importlib.reload(thomasa88lib.timeline)
 importlib.reload(thomasa88lib.manifest)
 importlib.reload(thomasa88lib.error)
 
+class RenameInfo:
+    def __init__(self, label, name_obj, select_obj):
+        self.label = label
+        self.name_obj = name_obj
+        self.select_obj = select_obj
+
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 AFTER_COMMAND_TERMINATE_ID = 'thomasa88_instantNameAfterCommandTerminate'
+
+# Heuristic to find new bodies
+UNNAMED_BODY_PATTERN = re.compile('Body\d+')
 
 app_ = None
 ui_ = None
@@ -170,6 +179,9 @@ def check_timeline(init=False):
             if new_objs:
                 global rename_objs_
 
+                # Creation order
+                new_objs.reverse()
+
                 rename_objs_ = []
                 for timeline_obj in new_objs:
                     # Can't access entity of all timeline objects
@@ -179,34 +191,37 @@ def check_timeline(init=False):
                     except RuntimeError:
                         entity = None
                     if entity:
-                        label = thomasa88lib.utils.short_class(timeline_obj.entity).replace('Feature', '')
-                        comp_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
-                        if comp_type != thomasa88lib.timeline.OCCURRENCE_NOT_OCCURRENCE:                      
-                            if comp_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
+                        entity_type = thomasa88lib.utils.short_class(timeline_obj.entity)
+                        label = entity_type.replace('Feature', '')
+                        if entity_type == 'Occurrence':
+                            occur_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
+                            if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
                                 # Only the "Component from bodies" feature can be renamed
-                                rename_objs_.append((timeline_obj, timeline_obj, label))
+                                rename_objs_.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
                             
                                 # In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
                                 #   forced onto the timeline object.
                                 # * Copy component means that the component already has a name.
                                 # Let the user name the component:
-                                rename_objs_.append((timeline_obj, entity.component, "Component"))
+                                rename_objs_.append(RenameInfo("Component", entity.component, entity.component))
                         else:
-                            rename_objs_.append((timeline_obj, timeline_obj, label))
+                            rename_objs_.append(RenameInfo(label, timeline_obj, entity))
+                            if hasattr(entity, 'bodies'):
+                                for body in entity.bodies:
+                                    if UNNAMED_BODY_PATTERN.match(body.name):
+                                        rename_objs_.append(RenameInfo(label + ' Body', body, body))
                     else:
                         # re: Move1 -> Move
                         label = re.sub(r'[0-9].*', '', timeline_obj.name)
-                        rename_objs_.append((timeline_obj, timeline_obj, label))
+                        rename_objs_.append(RenameInfo(label, timeline_obj, timeline_obj))
 
                 if rename_objs_:
                     rename_cmd_def_.execute()
     
     last_flat_timeline_ = current_flat_timeline
 
-def rename_command_created_handler(args):
-    eventArgs = adsk.core.CommandCreatedEventArgs.cast(args)
-
+def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     # The nifty thing with cast is that code completion then knows the object type
     cmd = adsk.core.Command.cast(args.command)
     
@@ -226,18 +241,20 @@ def rename_command_created_handler(args):
     
     events_manager_.add_handler(cmd.validateInputs,
                                 callback=rename_command_validate_inputs_handler)
+    
+    events_manager_.add_handler(cmd.inputChanged,
+                                callback=rename_command_input_changed_handler)
 
     inputs = cmd.commandInputs
     inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
-    for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
-        inputs.addStringValueInput(str(i), label, name_obj.name)
+    for i, rename in enumerate(rename_objs_):
+        inputs.addStringValueInput(str(i), rename.label, rename.name_obj.name)
 
     cmd.okButtonText = 'Set name (Enter)'
     cmd.cancelButtonText = 'Skip (Esc)'
 
-def rename_command_execute_handler(args):
-    eventArgs = adsk.core.CommandEventArgs.cast(args)
-    cmd = eventArgs.command
+def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
+    cmd = args.command
     inputs = cmd.commandInputs
 
     # No command is recorded to undo history as long as we don't do
@@ -247,49 +264,66 @@ def rename_command_execute_handler(args):
 
     if failures:
         # At least on operation failed
-        eventArgs.executeFailed = True
-        eventArgs.executeFailedMessage = f"{NAME} failed. Failed to rename features:<ul>"
+        args.executeFailed = True
+        args.executeFailedMessage = f"{NAME} failed. Failed to rename features:<ul>"
         for old_name, new_name in failures:
-            eventArgs.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
-        eventArgs.executeFailedMessage += "</ul>"
+            args.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
+        args.executeFailedMessage += "</ul>"
 
-def rename_command_execute_preview_handler(args):
-    eventArgs = adsk.core.CommandEventArgs.cast(args)
+def rename_command_execute_preview_handler(args: adsk.core.CommandEventArgs):
+    failures = try_rename_objects(args.command.commandInputs)
+    args.isValidResult = not failures
 
-    failures = try_rename_objects(eventArgs.command.commandInputs)
-    eventArgs.isValidResult = not failures
-
-def rename_command_destroy_handler(args):
-    eventArgs = adsk.core.CommandEventArgs.cast(args)
+def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
+    # Clear up automatic selections made during edit
+    global prev_focused_input_
+    if prev_focused_input_:
+        ui_.activeSelections.clear()
 
     # Update state
-    check_timeline(init=True)    
+    check_timeline(init=True)
 
-def rename_command_validate_inputs_handler(args):
-    eventArgs = adsk.core.ValidateInputsEventArgs.cast(args)
-
+def rename_command_validate_inputs_handler(args: adsk.core.ValidateInputsEventArgs):
     # Want to do rename_objects as a test in execute preview, but
     # Fusion stops calling the preview as soon as we set the state
     # to "invalid". Idea: Unset invalid if user changes an input.
-    for input in eventArgs.inputs:
+    for input in args.inputs:
         if not input.isReadOnly and len(input.value) == 0:
-            #eventArgs.areInputsValid = False
+            #args.areInputsValid = False
             break
     else:
-        eventArgs.areInputsValid = True
+        args.areInputsValid = True
+
+prev_focused_input_ = None
+def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
+    # Unfortunately, we cannot know when an input is selected,
+    # so selecting an object on input change is the best we can do.
+    global prev_focused_input_
+    if args.input == prev_focused_input_:
+        return
+    prev_focused_input_ = args.input
+
+    rename = rename_objs_[int(args.input.id)]
+    ui_.activeSelections.clear()
+    try:
+        # Cannot select timeline objects within components
+        # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/cannot-select-object-in-component-using-activeselections/td-p/9651198
+        ui_.activeSelections.add(rename.select_obj)
+    except RuntimeError:
+        pass
 
 def try_rename_objects(inputs):
     failures = []
     rename_count = 0
 
-    for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
+    for i, rename in enumerate(rename_objs_):
         input = inputs.itemById(str(i))
         try:
-            if name_obj.name != input.value:
-                name_obj.name = input.value
+            if rename.name_obj.name != input.value:
+                rename.name_obj.name = input.value
                 rename_count += 1
         except RuntimeError as e:
-            failures.append((name_obj.name, input.value))
+            failures.append((rename.name_obj.name, input.value))
             error_info = str(e)
             error_split = error_info.split(' : ', maxsplit=1)
             if len(error_split) == 2:
