@@ -211,27 +211,23 @@ def rename_command_created_handler(args):
     cmd.isExecutedWhenPreEmpted = False
 
     events_manager_.add_handler(cmd.execute,
-                                adsk.core.CommandEventHandler,
-                                rename_command_execute_handler)
+                                callback=rename_command_execute_handler)
     
     events_manager_.add_handler(cmd.executePreview,
-                                adsk.core.CommandEventHandler,
-                                rename_command_execute_preview_handler)
+                                callback=rename_command_execute_preview_handler)
 
     events_manager_.add_handler(cmd.destroy,
-                                adsk.core.CommandEventHandler,
-                                rename_command_destroy_handler)
+                                callback=rename_command_destroy_handler)
     
     events_manager_.add_handler(cmd.validateInputs,
-                                adsk.core.ValidateInputsEventHandler,
-                                rename_command_validate_inputs_handler)
+                                callback=rename_command_validate_inputs_handler)
 
     inputs = cmd.commandInputs
     inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
     for i, (timeline_obj, name_obj, label) in enumerate(rename_objs_):
         inputs.addStringValueInput(str(i), label, name_obj.name)
 
-    cmd.okButtonText = 'Rename (Enter)'
+    cmd.okButtonText = 'Set name (Enter)'
     cmd.cancelButtonText = 'Skip (Esc)'
 
 def rename_command_execute_handler(args):
@@ -319,21 +315,17 @@ def run(context):
                                                                     './resources/rename_icon')
 
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
-                                    adsk.core.CommandCreatedEventHandler,
-                                    rename_command_created_handler)
+                                    callback=rename_command_created_handler)
         
         events_manager_.add_handler(ui_.commandTerminated,
-                                    adsk.core.ApplicationCommandEventHandler,
-                                    command_terminated_handler)
+                                    callback=command_terminated_handler)
         
         after_terminate_event = events_manager_.register_event(AFTER_COMMAND_TERMINATE_ID)
         events_manager_.add_handler(after_terminate_event,
-                                    adsk.core.CustomEventHandler,
-                                    after_terminate_handler)
+                                    callback=after_terminate_handler)
         
         events_manager_.add_handler(ui_.workspaceActivated,
-                                    adsk.core.WorkspaceEventHandler,
-                                    workspace_activated_handler)
+                                    callback=workspace_activated_handler)
 
         check_timeline(init=True)
 
