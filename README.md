@@ -17,3 +17,7 @@ Press Shift+S in Fusion 360 and go to the *Add-Ins* tab. Then select the add-in 
 
 A naming dialog will be shown automatically when new features are created.
 
+## Changelog
+
+* v0.1.3
+  * Change to MIT license, for app store compatibility
