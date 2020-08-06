@@ -31,6 +31,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.0.0
+  * New logo
 * v 0.2.0
   * Rename new bodies and surfaces
   * Highlight active entity when name is edited
