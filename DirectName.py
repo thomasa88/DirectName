@@ -349,7 +349,7 @@ def run(context):
 
         # Use a Command to get a transaction when renaming
         rename_cmd_def_ = ui_.commandDefinitions.addButtonDefinition(SET_NAME_CMD_ID,
-                                                                    f'{NAME} v {manifest_["version"]}',
+                                                                    f'{NAME} (v {manifest_["version"]})',
                                                                     '',
                                                                     './resources/rename_icon')
 
