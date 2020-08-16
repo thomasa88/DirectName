@@ -60,7 +60,6 @@ class RenameInfo:
         self.select_obj = select_obj
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
-AFTER_COMMAND_TERMINATE_ID = 'thomasa88_instantNameAfterCommandTerminate'
 
 # Heuristic to find new bodies
 UNNAMED_BODY_PATTERN = re.compile('Body\d+')
@@ -77,26 +76,22 @@ last_flat_timeline_ = None
 rename_cmd_def_ = None
 rename_objs_ = None
 
-def workspace_activated_handler(args):
-    #eventArgs = adsk.core.WorkspaceEventArgs.cast(args)
-
+def workspace_activated_handler(args: adsk.core.WorkspaceEventArgs):
     # DocumentActivated is not always triggered (2020-07-27), so we mark
     # that we need an update here, but it will actually trigger on the
     # first command. (The timeline is not ready on in this event.)
-    # Bug: # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-application-documentactivated-event-do-not-raise/m-p/9020750
+    # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-application-documentactivated-event-do-not-raise/m-p/9020750
 
     global need_init_
     need_init_ = True
     #print("NEED INIT")
 
-def command_terminated_handler(args):
+def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     if ui_.activeWorkspace.id != 'FusionSolidEnvironment':
         # Only for the Design workspace
         return
-
-    eventArgs = adsk.core.ApplicationCommandEventArgs.cast(args)
     
-    #print("TERM", eventArgs.commandId, eventArgs.terminationReason, app_.activeEditObject.classType())
+    #print("TERM", args.commandId, args.terminationReason, app_.activeEditObject.classType())
 
     global need_init_
     if need_init_:
@@ -104,14 +99,14 @@ def command_terminated_handler(args):
         need_init_ = False
         return
 
-    if eventArgs.terminationReason != adsk.core.CommandTerminationReason.CompletedTerminationReason:
+    if args.terminationReason != adsk.core.CommandTerminationReason.CompletedTerminationReason:
         return
 
     # Heavy traffic commands
-    if eventArgs.commandId in ['SelectCommand', 'CommitCommand']:
+    if args.commandId in ['SelectCommand', 'CommitCommand']:
         return
 
-    if eventArgs.commandId == SET_NAME_CMD_ID:
+    if args.commandId == SET_NAME_CMD_ID:
         # self
         return
 
@@ -126,10 +121,10 @@ def command_terminated_handler(args):
     # sketch, but it wants to immediately fire a new command. The problem is
     # that we get the terminated event first (registered last?), so we block
     # the next command.
-    # Therefore, lets use an event to put ourselves at the end of the event queue.
-    app_.fireCustomEvent(AFTER_COMMAND_TERMINATE_ID)
+    # Therefore, let's put ourselves at the end of the event queue.
+    events_manager_.delay(after_terminate_handler)
 
-def after_terminate_handler(args):
+def after_terminate_handler():
     global need_init_
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
         check_timeline()
@@ -358,10 +353,6 @@ def run(context):
         
         events_manager_.add_handler(ui_.commandTerminated,
                                     callback=command_terminated_handler)
-        
-        after_terminate_event = events_manager_.register_event(AFTER_COMMAND_TERMINATE_ID)
-        events_manager_.add_handler(after_terminate_event,
-                                    callback=after_terminate_handler)
         
         events_manager_.add_handler(ui_.workspaceActivated,
                                     callback=workspace_activated_handler)
