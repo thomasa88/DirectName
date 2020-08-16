@@ -299,13 +299,45 @@ def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
     prev_focused_input_ = args.input
 
     rename = rename_objs_[int(args.input.id)]
-    ui_.activeSelections.clear()
+
+    # Selection logic from VerticalTimeline
+    design: adsk.fusion.Design = app_.activeProduct
+    entity = rename.select_obj
+
+    # Making this in a transactory way so the current selection is not removed
+    # if the entity is not selectable.
+    newSelection = adsk.core.ObjectCollection.create()
+
+    if isinstance(entity, adsk.fusion.Occurrence):
+        associated_component = entity.sourceComponent
+    elif isinstance(entity, adsk.fusion.ConstructionPlane):
+        associated_component = entity.parent
+    else:
+        associated_component = entity.parentComponent
+
+    if associated_component == design.rootComponent:
+        # There are no occurrences of root. Just a single instance: root. Can select the entity directly.
+        newSelection.add(entity)
+    else:
+        #Using _all_OccurrencesByComponent to get nested occurrences.
+        in_occurrences = design.rootComponent.allOccurrencesByComponent(associated_component)
+        if hasattr(entity, 'createForAssemblyContext'):
+            for occurrence in in_occurrences:
+                proxy = entity.createForAssemblyContext(occurrence)
+                newSelection.add(proxy)
+        elif hasattr(entity, 'bodies'):
+            # Workaround for Feature objects
+            ### TODO: Correctly select Feature objects. E.g. BoxFeature, CylinderFeature, ...
+            ###       so that editing them works.
+            for body in entity.bodies:
+                for occurrence in in_occurrences:
+                    proxy = body.createForAssemblyContext(occurrence)
+                    newSelection.add(proxy)
+
     try:
-        # Cannot select timeline objects within components
-        # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/cannot-select-object-in-component-using-activeselections/td-p/9651198
-        ui_.activeSelections.add(rename.select_obj)
-    except RuntimeError:
-        pass
+        ui_.activeSelections.all = newSelection
+    except RuntimeError as e:
+        print(f'{NAME} failed to select {thomasa88lib.utils.short_class(entity)}: {e}')
 
 def try_rename_objects(inputs):
     failures = []

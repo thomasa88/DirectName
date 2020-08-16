@@ -19,7 +19,11 @@ A naming dialog will be shown automatically when new features are created.
 
 Press Tab to navigate the inputs and press Enter when done. Press Esc to skip naming.
 
-The object whose name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360™ API limitations.)
+The object which name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360™ API limitations.)
+
+## Known Limitations
+
+* Highlighting of objects are delayed until the name is edited.
 
 ## Author
 
@@ -31,6 +35,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.1.0
+  * Fix highlighting of bodies that are part of components.
 * v 1.0.1
   * Pen logo
   * Autodesk® store conformance.
