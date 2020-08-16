@@ -25,9 +25,9 @@
      borderopacity="1.0"
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
-     inkscape:zoom="9.4765624"
-     inkscape:cx="-7.1039183"
-     inkscape:cy="20.711288"
+     inkscape:zoom="26.803766"
+     inkscape:cx="3.8560384"
+     inkscape:cy="8.3200208"
      inkscape:document-units="mm"
      inkscape:current-layer="layer1"
      showgrid="true"
@@ -38,7 +38,7 @@
      inkscape:window-y="-8"
      inkscape:window-maximized="1"
      inkscape:snap-global="true"
-     inkscape:snap-grids="true">
+     inkscape:snap-grids="false">
     <inkscape:grid
        type="xygrid"
        id="grid815"
@@ -164,5 +164,10 @@
        id="path865"
        d="m 1.9006926,295.95798 0.7451408,0.38054"
        style="fill:none;stroke:#000000;stroke-width:0.26458332px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" />
+    <path
+       style="fill:none;stroke:#d400aa;stroke-width:0.26458332;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-opacity:1"
+       d="m 3.1081519,293.49249 0.7189338,0.349"
+       id="path880"
+       inkscape:connector-curvature="0" />
   </g>
 </svg>
