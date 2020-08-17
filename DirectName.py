@@ -209,7 +209,7 @@ def check_timeline(init=False):
                     else:
                         # re: Move1 -> Move
                         label = re.sub(r'[0-9].*', '', timeline_obj.name)
-                        rename_objs_.append(RenameInfo(label, timeline_obj, timeline_obj))
+                        rename_objs_.append(RenameInfo(label, timeline_obj, None))
 
                 if rename_objs_:
                     rename_cmd_def_.execute()
@@ -304,6 +304,12 @@ def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
     design: adsk.fusion.Design = app_.activeProduct
     entity = rename.select_obj
 
+    ui_.activeSelections.clear()
+
+    if not entity:
+        # We did not manage to grab the entity we want to select
+        return
+
     # Making this in a transactory way so the current selection is not removed
     # if the entity is not selectable.
     newSelection = adsk.core.ObjectCollection.create()
@@ -312,8 +318,11 @@ def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
         associated_component = entity.sourceComponent
     elif isinstance(entity, adsk.fusion.ConstructionPlane):
         associated_component = entity.parent
-    else:
+    elif hasattr(entity, 'parentComponent'):
         associated_component = entity.parentComponent
+    else:
+        print(f'DirectName: {thomasa88lib.utils.short_class(entity)} does not have parent component')
+        return
 
     if associated_component == design.rootComponent:
         # There are no occurrences of root. Just a single instance: root. Can select the entity directly.
