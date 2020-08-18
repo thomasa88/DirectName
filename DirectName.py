@@ -234,19 +234,29 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     events_manager_.add_handler(cmd.destroy,
                                 callback=rename_command_destroy_handler)
     
-    events_manager_.add_handler(cmd.validateInputs,
-                                callback=rename_command_validate_inputs_handler)
-    
     events_manager_.add_handler(cmd.inputChanged,
                                 callback=rename_command_input_changed_handler)
 
     inputs = cmd.commandInputs
     inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
+
+    # Using a table, since it will trigger inputChanged when the user uses the mouse to focus
+    # an input. Unfortunately, it does not trigger on focus change made by the keyboard.
+    table = inputs.addTableCommandInput('table', '', 2, '2:3')
+    table.tablePresentationStyle = adsk.core.TablePresentationStyles.transparentBackgroundTablePresentationStyle
+
     for i, rename in enumerate(rename_objs_):
-        inputs.addStringValueInput(str(i), rename.label, rename.name_obj.name)
+        label_input = table.commandInputs.addStringValueInput(f'label_{i}', '', rename.label)
+        label_input.isReadOnly = True
+        string_input = table.commandInputs.addStringValueInput(f'string_{i}', rename.label, rename.name_obj.name)
+        table.addCommandInput(label_input, i, 0)
+        table.addCommandInput(string_input, i, 1)
 
     cmd.okButtonText = 'Set name (Enter)'
     cmd.cancelButtonText = 'Skip (Esc)'
+
+    if table.rowCount > 0:
+        focus_changed(table.getInputAtPosition(0, 0))
 
 def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
     cmd = args.command
@@ -278,27 +288,19 @@ def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
     # Update state
     check_timeline(init=True)
 
-def rename_command_validate_inputs_handler(args: adsk.core.ValidateInputsEventArgs):
-    # Want to do rename_objects as a test in execute preview, but
-    # Fusion stops calling the preview as soon as we set the state
-    # to "invalid". Idea: Unset invalid if user changes an input.
-    for input in args.inputs:
-        if not input.isReadOnly and len(input.value) == 0:
-            #args.areInputsValid = False
-            break
-    else:
-        args.areInputsValid = True
+def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
+    # Unfortunately, we cannot know when an input is selected using the keyboard,
+    # so selecting an object on input change is the best we can do.
+    focus_changed(args.input)
 
 prev_focused_input_ = None
-def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
-    # Unfortunately, we cannot know when an input is selected,
-    # so selecting an object on input change is the best we can do.
+def focus_changed(input):
     global prev_focused_input_
-    if args.input == prev_focused_input_:
+    if input == prev_focused_input_:
         return
-    prev_focused_input_ = args.input
+    prev_focused_input_ = input
 
-    rename = rename_objs_[int(args.input.id)]
+    rename = rename_objs_[int(input.id.split('_')[-1])]
 
     # Selection logic from VerticalTimeline
     design: adsk.fusion.Design = app_.activeProduct
@@ -353,7 +355,7 @@ def try_rename_objects(inputs):
     rename_count = 0
 
     for i, rename in enumerate(rename_objs_):
-        input = inputs.itemById(str(i))
+        input = inputs.itemById(f'string_{i}')
         try:
             if rename.name_obj.name != input.value:
                 rename.name_obj.name = input.value
