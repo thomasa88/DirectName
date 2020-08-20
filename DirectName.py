@@ -26,6 +26,11 @@
 
 import adsk.core, adsk.fusion, adsk.cam, traceback
 
+# Text Commands. Python version.
+# neu_dev.list_functions()
+import neu_server
+import neu_modeling
+
 import os
 import re
 import sys
@@ -53,11 +58,16 @@ importlib.reload(thomasa88lib.timeline)
 importlib.reload(thomasa88lib.manifest)
 importlib.reload(thomasa88lib.error)
 
+class RenameType:
+    API = 1
+    TEXT_COMMAND = 2
+
 class RenameInfo:
-    def __init__(self, label, name_obj, select_obj):
+    def __init__(self, label, name_obj, select_obj, rename_type=RenameType.API):
         self.label = label
         self.name_obj = name_obj
         self.select_obj = select_obj
+        self.rename_type = rename_type
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 
@@ -122,16 +132,38 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     # that we get the terminated event first (registered last?), so we block
     # the next command.
     # Therefore, let's put ourselves at the end of the event queue.
-    events_manager_.delay(after_terminate_handler)
+    events_manager_.delay(lambda: after_terminate_handler(args.commandId))
 
-def after_terminate_handler():
+def after_terminate_handler(command_id):
     global need_init_
+    global rename_objs_
+    # Check that the user is not active in another command
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
-        check_timeline()
+        if command_id == 'FusionHalfSectionViewCommand':
+            analysis_entity_id = neu_server.get_entity_id("VisualAnalyses")
+            child_count = neu_modeling.get_child_count(analysis_entity_id)
+            # Most likely the last child is the new one(?)
+            for i in range(child_count - 1, -1, -1):
+                # neu_server.get_user_name() always gives a name
+                # properties['userName'] is empty if the user has not set it
+                # properties['creationIndex'] is the default index. E.g. In Section3 index is 3.
+                section_id = neu_modeling.get_child(analysis_entity_id, i)['entityId']
+                section_properties = neu_server.get_entity_properties(section_id)
+                if section_properties['userName'] == '':
+                    rename_info = RenameInfo("Section", section_id, section_id, RenameType.TEXT_COMMAND)
+                    rename_objs_ = [ rename_info ]
+                    rename_cmd_def_.execute()
+                    break
+        else:
+            rename_objs_ = check_timeline()
+            if rename_objs_:
+                rename_cmd_def_.execute()
 
 def check_timeline(init=False):
     global last_flat_timeline_
     #print("CHECK", not init)
+    rename_objs = []
+
     status, timeline = thomasa88lib.timeline.get_timeline()
     if status != thomasa88lib.timeline.TIMELINE_STATUS_OK:
         return
@@ -172,12 +204,9 @@ def check_timeline(init=False):
                 new_objs.append(obj)
 
             if new_objs:
-                global rename_objs_
-
                 # Creation order
                 new_objs.reverse()
 
-                rename_objs_ = []
                 for timeline_obj in new_objs:
                     # Can't access entity of all timeline objects
                     # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-cannot-access-entity-of-quot-move-quot-feature/m-p/9651921
@@ -192,29 +221,27 @@ def check_timeline(init=False):
                             occur_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
                             if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
                                 # Only the "Component from bodies" feature can be renamed
-                                rename_objs_.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
+                                rename_objs.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
                             
                                 # In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
                                 #   forced onto the timeline object.
                                 # * Copy component means that the component already has a name.
                                 # Let the user name the component:
-                                rename_objs_.append(RenameInfo("Component", entity.component, entity.component))
+                                rename_objs.append(RenameInfo("Component", entity.component, entity.component))
                         else:
-                            rename_objs_.append(RenameInfo(label, timeline_obj, entity))
+                            rename_objs.append(RenameInfo(label, timeline_obj, entity))
                             if hasattr(entity, 'bodies'):
                                 for body in entity.bodies:
                                     if UNNAMED_BODY_PATTERN.match(body.name):
-                                        rename_objs_.append(RenameInfo(label + ' Body', body, body))
+                                        rename_objs.append(RenameInfo(label + ' Body', body, body))
                     else:
                         # re: Move1 -> Move
                         label = re.sub(r'[0-9].*', '', timeline_obj.name)
-                        rename_objs_.append(RenameInfo(label, timeline_obj, None))
+                        rename_objs.append(RenameInfo(label, timeline_obj, None))
 
-                if rename_objs_:
-                    rename_cmd_def_.execute()
-    
     last_flat_timeline_ = current_flat_timeline
+    return rename_objs
 
 def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     # The nifty thing with cast is that code completion then knows the object type
@@ -248,7 +275,13 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     for i, rename in enumerate(rename_objs_):
         label_input = table.commandInputs.addStringValueInput(f'label_{i}', '', rename.label)
         label_input.isReadOnly = True
-        string_input = table.commandInputs.addStringValueInput(f'string_{i}', rename.label, rename.name_obj.name)
+        if rename.rename_type == RenameType.API:
+            obj_name = rename.name_obj.name
+        elif rename.rename_type == RenameType.TEXT_COMMAND:
+            obj_name = neu_server.get_user_name(rename.name_obj)
+        else:
+            raise Exception(f"Unknown rename type: {rename.rename_type}")
+        string_input = table.commandInputs.addStringValueInput(f'string_{i}', rename.label, obj_name)
         table.addCommandInput(label_input, i, 0)
         table.addCommandInput(string_input, i, 1)
 
@@ -265,7 +298,7 @@ def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
     # No command is recorded to undo history as long as we don't do
     # anything during the execute.
 
-    failures, rename_count = try_rename_objects(inputs)
+    failures = try_rename_objects(inputs)
 
     if failures:
         # At least on operation failed
@@ -302,64 +335,74 @@ def focus_changed(input):
 
     rename = rename_objs_[int(input.id.split('_')[-1])]
 
-    # Selection logic from VerticalTimeline
-    design: adsk.fusion.Design = app_.activeProduct
-    entity = rename.select_obj
-
     ui_.activeSelections.clear()
 
-    if not entity:
-        # We did not manage to grab the entity we want to select
-        return
+    if rename.rename_type == RenameType.API:
+        # Selection logic from VerticalTimeline
+        design: adsk.fusion.Design = app_.activeProduct
+        entity = rename.select_obj
+        if not entity:
+            # We did not manage to grab the entity we want to select
+            return
 
-    # Making this in a transactory way so the current selection is not removed
-    # if the entity is not selectable.
-    newSelection = adsk.core.ObjectCollection.create()
+        # Making this in a transactory way so the current selection is not removed
+        # if the entity is not selectable.
+        newSelection = adsk.core.ObjectCollection.create()
 
-    if isinstance(entity, adsk.fusion.Occurrence):
-        associated_component = entity.sourceComponent
-    elif isinstance(entity, adsk.fusion.ConstructionPlane):
-        associated_component = entity.parent
-    elif hasattr(entity, 'parentComponent'):
-        associated_component = entity.parentComponent
-    else:
-        print(f'DirectName: {thomasa88lib.utils.short_class(entity)} does not have parent component')
-        return
+        if isinstance(entity, adsk.fusion.Occurrence):
+            associated_component = entity.sourceComponent
+        elif isinstance(entity, adsk.fusion.ConstructionPlane):
+            associated_component = entity.parent
+        elif hasattr(entity, 'parentComponent'):
+            associated_component = entity.parentComponent
+        else:
+            print(f'DirectName: {thomasa88lib.utils.short_class(entity)} does not have parent component')
+            return
 
-    if associated_component == design.rootComponent:
-        # There are no occurrences of root. Just a single instance: root. Can select the entity directly.
-        newSelection.add(entity)
-    else:
-        #Using _all_OccurrencesByComponent to get nested occurrences.
-        in_occurrences = design.rootComponent.allOccurrencesByComponent(associated_component)
-        if hasattr(entity, 'createForAssemblyContext'):
-            for occurrence in in_occurrences:
-                proxy = entity.createForAssemblyContext(occurrence)
-                newSelection.add(proxy)
-        elif hasattr(entity, 'bodies'):
-            # Workaround for Feature objects
-            ### TODO: Correctly select Feature objects. E.g. BoxFeature, CylinderFeature, ...
-            ###       so that editing them works.
-            for body in entity.bodies:
+        if associated_component == design.rootComponent:
+            # There are no occurrences of root. Just a single instance: root. Can select the entity directly.
+            newSelection.add(entity)
+        else:
+            #Using _all_OccurrencesByComponent to get nested occurrences.
+            in_occurrences = design.rootComponent.allOccurrencesByComponent(associated_component)
+            if hasattr(entity, 'createForAssemblyContext'):
                 for occurrence in in_occurrences:
-                    proxy = body.createForAssemblyContext(occurrence)
+                    proxy = entity.createForAssemblyContext(occurrence)
                     newSelection.add(proxy)
+            elif hasattr(entity, 'bodies'):
+                # Workaround for Feature objects
+                ### TODO: Correctly select Feature objects. E.g. BoxFeature, CylinderFeature, ...
+                ###       so that editing them works.
+                for body in entity.bodies:
+                    for occurrence in in_occurrences:
+                        proxy = body.createForAssemblyContext(occurrence)
+                        newSelection.add(proxy)
 
-    try:
-        ui_.activeSelections.all = newSelection
-    except RuntimeError as e:
-        print(f'{NAME} failed to select {thomasa88lib.utils.short_class(entity)}: {e}')
+        try:
+            ui_.activeSelections.all = newSelection
+        except RuntimeError as e:
+            print(f'{NAME} failed to select {thomasa88lib.utils.short_class(entity)}: {e}')
+    elif rename.rename_type == RenameType.TEXT_COMMAND:
+        #neu_ui.add_selection(rename.name_obj) # Need "valid JSON" for this
+        # Commands.Select seems to only accept an ONK (path)
+        # Selections.Add seems to accept an ONK (path), an entity ID or entity ref (name)(?)
+        app_.executeTextCommand(f'Selections.Add {rename.name_obj}')
+        #app_.executeTextCommand(f'Commands.Select "ONK::*/*/VisualAnalyses/SectionViewAnalysis=0"')
 
 def try_rename_objects(inputs):
     failures = []
-    rename_count = 0
 
     for i, rename in enumerate(rename_objs_):
         input = inputs.itemById(f'string_{i}')
         try:
-            if rename.name_obj.name != input.value:
-                rename.name_obj.name = input.value
-                rename_count += 1
+            if rename.rename_type == RenameType.API:
+                if rename.name_obj.name != input.value:
+                    rename.name_obj.name = input.value
+            elif rename.rename_type == RenameType.TEXT_COMMAND:
+                if neu_server.get_user_name(rename.name_obj) != input.value:
+                    neu_server.rename(rename.name_obj, input.value)
+            else:
+                raise Exception(f"Unknown rename type: {rename.rename_type}")
         except RuntimeError as e:
             failures.append((rename.name_obj.name, input.value))
             error_info = str(e)
@@ -367,7 +410,7 @@ def try_rename_objects(inputs):
             if len(error_split) == 2:
                 error_info = error_split[1]
     
-    return failures, rename_count
+    return failures
 
 def run(context):
     global app_
