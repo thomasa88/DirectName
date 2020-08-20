@@ -85,21 +85,37 @@ need_init_ = True
 last_flat_timeline_ = None
 rename_cmd_def_ = None
 rename_objs_ = None
+command_terminated_handler_info_ = None
 
 def workspace_activated_handler(args: adsk.core.WorkspaceEventArgs):
-    # DocumentActivated is not always triggered (2020-07-27), so we mark
-    # that we need an update here, but it will actually trigger on the
-    # first command. (The timeline is not ready on in this event.)
-    # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-application-documentactivated-event-do-not-raise/m-p/9020750
-
     global need_init_
-    need_init_ = True
-    #print("NEED INIT")
+
+    if ui_.activeWorkspace.id == 'FusionSolidEnvironment':
+        # DocumentActivated is not always triggered (2020-07-27), so we mark
+        # that we need an update here, but it will actually trigger on the
+        # first command. (The timeline is not ready on in this event.)
+        # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-application-documentactivated-event-do-not-raise/m-p/9020750
+        need_init_ = True
+        enable()
+
+def workspace_pre_deactivate_handler(args: adsk.core.WorkspaceEventArgs):
+    disable()
+
+def enable():
+    global command_terminated_handler_info_
+    if not command_terminated_handler_info_:
+        command_terminated_handler_info_ = events_manager_.add_handler(ui_.commandTerminated,
+                                            callback=command_terminated_handler)
+
+def disable():
+    global command_terminated_handler_info_
+    if command_terminated_handler_info_:
+        command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
-    if ui_.activeWorkspace.id != 'FusionSolidEnvironment':
-        # Only for the Design workspace
-        return
+    #if ui_.activeWorkspace.id != 'FusionSolidEnvironment':
+    #    # Only for the Design workspace
+    #    return
     
     #print("TERM", args.commandId, args.terminationReason, app_.activeEditObject.classType())
 
@@ -437,13 +453,15 @@ def run(context):
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
                                     callback=rename_command_created_handler)
         
-        events_manager_.add_handler(ui_.commandTerminated,
-                                    callback=command_terminated_handler)
-        
         events_manager_.add_handler(ui_.workspaceActivated,
                                     callback=workspace_activated_handler)
+        
+        events_manager_.add_handler(ui_.workspacePreDeactivate,
+                                    callback=workspace_pre_deactivate_handler)
 
-        check_timeline(init=True)
+        if app_.isStartupComplete and ui_.activeWorkspace.id == 'FusionSolidEnvironment':
+            check_timeline(init=True)
+            enable()
 
 def stop(context):
     with error_catcher_:

@@ -24,6 +24,7 @@ The object which name is being edited will be highlighted (Object does not get h
 ## Known Limitations
 
 * Highlighting of objects are delayed until the name is edited.
+* Does not work in Direct Edit mode.
 
 ## Author
 
@@ -38,6 +39,7 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 * v 1.1.2
   * Highlight correct entity on mouse focus (Focusing by keyboard still only happens after text change ([Limitation](https://forums.autodesk.com/t5/fusion-360-api-and-scripts/event-when-commandinput-is-focused/m-p/9693906)).)
   * Name Section Analyses after creation.
+  * Fix error when closing documents and exiting Fusion 360™.
 * v 1.1.1
   * Handle objects that are not selectable, due to Fusion 360™ [API limitations](https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-cannot-access-entity-of-quot-move-quot-feature/m-p/9651921).
 * v 1.1.0
