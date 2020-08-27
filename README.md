@@ -19,7 +19,7 @@ Press Tab to navigate the inputs and press Enter when done. Press Esc to skip na
 
 The object which name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360™ API limitations.)
 
-The add-in can be temporarily disabled using the *Scripts and Add-ins* dialog. Press* Shift+S in Fusion 360™ and go to the *Add-Ins* tab.
+The add-in can be temporarily disabled using the *Scripts and Add-ins* dialog. Press *Shift+S* in Fusion 360™ and go to the *Add-Ins* tab.
 
 ## Known Limitations
 
