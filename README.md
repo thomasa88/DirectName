@@ -19,6 +19,8 @@ Press Tab to navigate the inputs and press Enter when done. Press Esc to skip na
 
 The object which name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360™ API limitations.)
 
+Enable/disable the naming dialog by clicking on the *DIRECTNAME* button under the *TOOLS* tab.
+
 The add-in can be temporarily disabled using the *Scripts and Add-ins* dialog. Press *Shift+S* in Fusion 360™ and go to the *Add-Ins* tab.
 
 ## Known Limitations
@@ -36,6 +38,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.2.0
+  * Enable/Disable button. Autodesk® store conformance.
 * v 1.1.3
   * Enable *Run on Startup* by default.
 * v 1.1.2

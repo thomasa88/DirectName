@@ -38,7 +38,7 @@ import sys
 ### TODO:
 ### Option to name new bodies, views etc?
 
-NAME = 'Direct Name'
+NAME = 'DirectName'
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 
@@ -49,6 +49,7 @@ from .thomasa88lib import events
 from .thomasa88lib import timeline
 from .thomasa88lib import manifest
 from .thomasa88lib import error
+from .thomasa88lib import settings
 
 # Force modules to be fresh during development
 import importlib
@@ -57,6 +58,7 @@ importlib.reload(thomasa88lib.events)
 importlib.reload(thomasa88lib.timeline)
 importlib.reload(thomasa88lib.manifest)
 importlib.reload(thomasa88lib.error)
+importlib.reload(thomasa88lib.settings)
 
 class RenameType:
     API = 1
@@ -70,6 +72,8 @@ class RenameInfo:
         self.rename_type = rename_type
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
+PANEL_ID = 'thomasa88_DirectNamePanel'
+ENABLE_CMD_DEF_ID = 'thomasa88_DirectNameEnable'
 
 # Heuristic to find new bodies
 UNNAMED_BODY_PATTERN = re.compile('Body\d+')
@@ -80,12 +84,23 @@ ui_ = None
 error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False)
 events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
+settings_ = thomasa88lib.settings.SettingsManager(
+    { 'enabled': True }
+)
 
 need_init_ = True
 last_flat_timeline_ = None
 rename_cmd_def_ = None
+enable_cmd_def_ = None
 rename_objs_ = None
 command_terminated_handler_info_ = None
+panel_ = None
+
+def set_enabled(value):
+    settings_['enabled'] = value
+
+def get_enabled():
+    return settings_['enabled']
 
 def workspace_activated_handler(args: adsk.core.WorkspaceEventArgs):
     global need_init_
@@ -96,33 +111,33 @@ def workspace_activated_handler(args: adsk.core.WorkspaceEventArgs):
         # first command. (The timeline is not ready on in this event.)
         # Bug: https://forums.autodesk.com/t5/fusion-360-api-and-scripts/api-bug-application-documentactivated-event-do-not-raise/m-p/9020750
         need_init_ = True
-        enable()
+        start_monitoring()
 
 def workspace_pre_deactivate_handler(args: adsk.core.WorkspaceEventArgs):
-    disable()
+    stop_monitoring()
 
-def enable():
+def start_monitoring():
     global command_terminated_handler_info_
     if not command_terminated_handler_info_:
         command_terminated_handler_info_ = events_manager_.add_handler(ui_.commandTerminated,
                                             callback=command_terminated_handler)
 
-def disable():
+def stop_monitoring():
     global command_terminated_handler_info_
     if command_terminated_handler_info_:
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
-    #if ui_.activeWorkspace.id != 'FusionSolidEnvironment':
-    #    # Only for the Design workspace
-    #    return
-    
     #print("TERM", args.commandId, args.terminationReason, app_.activeEditObject.classType())
 
     global need_init_
     if need_init_:
         check_timeline(init=True)
         need_init_ = False
+        return
+
+    if not get_enabled():
+        # Simplest way to enable/disable the add-in: Use as a "filter" in this monitor
         return
 
     if args.terminationReason != adsk.core.CommandTerminationReason.CompletedTerminationReason:
@@ -428,10 +443,37 @@ def try_rename_objects(inputs):
     
     return failures
 
+def enable_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
+    enable = not get_enabled()
+    set_enabled(enable)
+    update_enable_button()
+    
+    # Need to reset state/cache to not ask for all things that were added
+    # during the disabled state.
+    global need_init_
+    need_init_ = True
+
+def update_enable_button():
+    if get_enabled():
+        state_text = 'enabled'
+        enable_cmd_def_.resourceFolder = './resources/rename_icon'
+    else:
+        state_text = 'disabled'
+        enable_cmd_def_.resourceFolder = './resources/rename_disabled'
+    
+    # Newline to add some spacing to the toolClip image.
+    enable_cmd_def_.tooltip = f'{NAME} is currently {state_text}.\n'
+    
+    # Note: Name must be updated for icon to change!
+    # And the name must be set on the controlDefinition!
+    enable_cmd_def_.controlDefinition.name = f'Enable/Disable {NAME}'
+
 def run(context):
     global app_
     global ui_
     global rename_cmd_def_
+    global enable_cmd_def_
+    global panel_
     with error_catcher_:
         app_ = adsk.core.Application.get()
         ui_ = app_.userInterface
@@ -450,6 +492,27 @@ def run(context):
                                                                     '',
                                                                     './resources/rename_icon')
 
+        tab = ui_.allToolbarTabs.itemById('ToolsTab')
+        panel_ = tab.toolbarPanels.itemById(PANEL_ID)
+        if panel_:
+            panel_.deleteMe()
+        panel_ = tab.toolbarPanels.add(PANEL_ID, f'{NAME}')
+
+        enable_cmd_def_ = ui_.commandDefinitions.itemById(ENABLE_CMD_DEF_ID)
+        if enable_cmd_def_:
+            enable_cmd_def_.deleteMe()
+        enable_cmd_def_ = ui_.commandDefinitions.addButtonDefinition(ENABLE_CMD_DEF_ID,
+                                                                    'Loading...',
+                                                                    '',
+                                                                    './resources/rename_disabled')
+        update_enable_button()
+        enable_cmd_def_.toolClipFilename = './resources/small_screenshot/screenshot.png'
+        events_manager_.add_handler(enable_cmd_def_.commandCreated,
+                                    callback=enable_command_created_handler)
+        enable_control = panel_.controls.addCommand(enable_cmd_def_)
+        enable_control.isPromoted = True
+        enable_control.isPromotedByDefault = True
+
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
                                     callback=rename_command_created_handler)
         
@@ -461,7 +524,7 @@ def run(context):
 
         if app_.isStartupComplete and ui_.activeWorkspace.id == 'FusionSolidEnvironment':
             check_timeline(init=True)
-            enable()
+            start_monitoring()
 
 def stop(context):
     with error_catcher_:
@@ -470,3 +533,5 @@ def stop(context):
         cmd_def = ui_.commandDefinitions.itemById(SET_NAME_CMD_ID)
         if cmd_def:
             cmd_def.deleteMe()
+
+        panel_.deleteMe()
