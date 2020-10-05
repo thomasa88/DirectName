@@ -4,7 +4,13 @@ DirectName is an Autodesk® Fusion 360™ add-in for naming features and bodies 
 
 ![Screenshot](screenshot.png)
 
+## Supported Platforms
+
+* Windows
+* Mac OS
+
 ## Installation
+
 Download the add-in from the [Releases](https://github.com/thomasa88/DirectName/releases) page.
 
 Unpack it into `API\AddIns` (see [How to install an add-in or script in Fusion 360](https://knowledge.autodesk.com/support/fusion-360/troubleshooting/caas/sfdcarticles/sfdcarticles/How-to-install-an-ADD-IN-and-Script-in-Fusion-360.html)).
@@ -27,6 +33,12 @@ The add-in can be temporarily disabled using the *Scripts and Add-ins* dialog. P
 
 * Highlighting of objects are delayed until the name is edited, if navigating with the keyboard.
 * Does not work in Direct Edit mode.
+
+## Reporting Issues
+
+Please report any issues that you find on the [Issues](https://github.com/thomasa88/DirectName/issues) page.
+
+For better support, please include the steps you performed and the result. Also include copies of any error messages.
 
 ## Author
 
