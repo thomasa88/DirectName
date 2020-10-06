@@ -32,7 +32,8 @@ The add-in can be temporarily disabled using the *Scripts and Add-ins* dialog. P
 ## Known Limitations
 
 * Highlighting of objects are delayed until the name is edited, if navigating with the keyboard.
-* Does not work in Direct Edit mode.
+* Direct Edit mode is not supported.
+* DirectName loses track of changes when switching documents while creating a feature.
 
 ## Reporting Issues
 
