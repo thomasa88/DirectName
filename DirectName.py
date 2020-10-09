@@ -76,7 +76,7 @@ PANEL_ID = 'thomasa88_DirectNamePanel'
 ENABLE_CMD_DEF_ID = 'thomasa88_DirectNameEnable'
 
 # Heuristic to find new bodies
-UNNAMED_BODY_PATTERN = re.compile('Body\d+')
+UNNAMED_BODY_PATTERN = re.compile('(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
 
 app_ = None
 ui_ = None
@@ -264,6 +264,9 @@ def check_timeline(init=False):
                             rename_objs.append(RenameInfo(label, timeline_obj, entity))
                             if hasattr(entity, 'bodies'):
                                 for body in entity.bodies:
+                                    # We cannot see if a body is newly created by this feature or already existed(?)
+                                    # Using a heuristic to catch all unnamed bodies. Possibly change to tracking the
+                                    # component tree (i.e. what is shown in the Browser).
                                     if UNNAMED_BODY_PATTERN.match(body.name):
                                         rename_objs.append(RenameInfo(label + ' Body', body, body))
                     else:
