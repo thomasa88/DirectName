@@ -5,17 +5,17 @@
 # features directly after creation.
 #
 # Copyright (c) 2020 Thomas Axelsson
-# 
+#
 # Permission is hereby granted, free of charge, to any person obtaining a copy
 # of this software and associated documentation files (the "Software"), to deal
 # in the Software without restriction, including without limitation the rights
 # to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 # copies of the Software, and to permit persons to whom the Software is
 # furnished to do so, subject to the following conditions:
-# 
+#
 # The above copyright notice and this permission notice shall be included in all
 # copies or substantial portions of the Software.
-# 
+#
 # THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 # IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 # FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -215,12 +215,12 @@ def check_timeline(init=False):
                 break
             index = next_index
             last_new_obj = next_obj
-        
+
         if last_new_obj:
             # The user cannot name two timeline objects the same thing, but they
             # can do create, undo, create and get a new object with the exact
             # same name, making us miss it, if we go by name.
-            
+
             # If an object is dragged in the timeline, we won't find it in the same place,
             # but it is not a new object - so search the whole old timeline.
 
@@ -253,7 +253,7 @@ def check_timeline(init=False):
                             if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
                                 # Only the "Component from bodies" feature can be renamed
                                 rename_objs.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
-                            
+
                                 # In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
                                 #   forced onto the timeline object.
@@ -280,7 +280,7 @@ def check_timeline(init=False):
 def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     # The nifty thing with cast is that code completion then knows the object type
     cmd = adsk.core.Command.cast(args.command)
-    
+
     # Don't spam the right click shortcut menu
     cmd.isRepeatable = False
     # Don't save if the user goes on to another command
@@ -288,13 +288,13 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
 
     events_manager_.add_handler(cmd.execute,
                                 callback=rename_command_execute_handler)
-    
+
     events_manager_.add_handler(cmd.executePreview,
                                 callback=rename_command_execute_preview_handler)
 
     events_manager_.add_handler(cmd.destroy,
                                 callback=rename_command_destroy_handler)
-    
+
     events_manager_.add_handler(cmd.inputChanged,
                                 callback=rename_command_input_changed_handler)
 
@@ -350,7 +350,8 @@ def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
     # Clear up automatic selections made during edit
     global prev_focused_input_
     if prev_focused_input_:
-        ui_.activeSelections.clear()
+        # ui_.activeSelections.clear()
+        pass
 
     # Update state
     check_timeline(init=True)
@@ -369,7 +370,8 @@ def focus_changed(input):
 
     rename = rename_objs_[int(input.id.split('_')[-1])]
 
-    ui_.activeSelections.clear()
+    # ui_.activeSelections.clear()
+    pass
 
     if rename.rename_type == RenameType.API:
         # Selection logic from VerticalTimeline
@@ -443,14 +445,14 @@ def try_rename_objects(inputs):
             error_split = error_info.split(' : ', maxsplit=1)
             if len(error_split) == 2:
                 error_info = error_split[1]
-    
+
     return failures
 
 def enable_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     enable = not get_enabled()
     set_enabled(enable)
     update_enable_button()
-    
+
     # Need to reset state/cache to not ask for all things that were added
     # during the disabled state.
     global need_init_
@@ -463,10 +465,10 @@ def update_enable_button():
     else:
         state_text = 'disabled'
         enable_cmd_def_.resourceFolder = './resources/rename_disabled'
-    
+
     # Newline to add some spacing to the toolClip image.
     enable_cmd_def_.tooltip = f'{NAME} is currently {state_text}.\n'
-    
+
     # Note: Name must be updated for icon to change!
     # And the name must be set on the controlDefinition!
     enable_cmd_def_.controlDefinition.name = f'Enable/Disable {NAME}'
@@ -518,10 +520,10 @@ def run(context):
 
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
                                     callback=rename_command_created_handler)
-        
+
         events_manager_.add_handler(ui_.workspaceActivated,
                                     callback=workspace_activated_handler)
-        
+
         events_manager_.add_handler(ui_.workspacePreDeactivate,
                                     callback=workspace_pre_deactivate_handler)
 
