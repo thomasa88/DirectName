@@ -51,6 +51,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.2.2
+  * Remove highlighting of features, to fix "InternalValidationError : selecCmd" error.
 * v 1.2.1
   * Fix "new body" heuristic to handle all Fusion 360™ languages.
 * v 1.2.0
