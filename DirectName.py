@@ -81,7 +81,7 @@ UNNAMED_BODY_PATTERN = re.compile('(?:Body|实体|Körper|ボディ|Corps|Corpo)
 app_ = None
 ui_ = None
 
-error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False)
+error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False, msg_prefix=NAME)
 events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
 settings_ = thomasa88lib.settings.SettingsManager(
