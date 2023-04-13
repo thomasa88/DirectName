@@ -295,9 +295,6 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     events_manager_.add_handler(cmd.destroy,
                                 callback=rename_command_destroy_handler)
     
-    events_manager_.add_handler(cmd.inputChanged,
-                                callback=rename_command_input_changed_handler)
-
     inputs = cmd.commandInputs
     inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
 
@@ -322,9 +319,6 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     cmd.okButtonText = 'Set name (Enter)'
     cmd.cancelButtonText = 'Skip (Esc)'
 
-    if table.rowCount > 0:
-        focus_changed(table.getInputAtPosition(0, 0))
-
 def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
     cmd = args.command
     inputs = cmd.commandInputs
@@ -347,81 +341,8 @@ def rename_command_execute_preview_handler(args: adsk.core.CommandEventArgs):
     args.isValidResult = not failures
 
 def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
-    # Clear up automatic selections made during edit
-    global prev_focused_input_
-    if prev_focused_input_:
-        ui_.activeSelections.clear()
-
     # Update state
     check_timeline(init=True)
-
-def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
-    # Unfortunately, we cannot know when an input is selected using the keyboard,
-    # so selecting an object on input change is the best we can do.
-    focus_changed(args.input)
-
-prev_focused_input_ = None
-def focus_changed(input):
-    global prev_focused_input_
-    if input == prev_focused_input_:
-        return
-    prev_focused_input_ = input
-
-    rename = rename_objs_[int(input.id.split('_')[-1])]
-
-    ui_.activeSelections.clear()
-
-    if rename.rename_type == RenameType.API:
-        # Selection logic from VerticalTimeline
-        design: adsk.fusion.Design = app_.activeProduct
-        entity = rename.select_obj
-        if not entity:
-            # We did not manage to grab the entity we want to select
-            return
-
-        # Making this in a transactory way so the current selection is not removed
-        # if the entity is not selectable.
-        newSelection = adsk.core.ObjectCollection.create()
-
-        if isinstance(entity, adsk.fusion.Occurrence):
-            associated_component = entity.sourceComponent
-        elif isinstance(entity, adsk.fusion.ConstructionPlane):
-            associated_component = entity.parent
-        elif hasattr(entity, 'parentComponent'):
-            associated_component = entity.parentComponent
-        else:
-            print(f'DirectName: {thomasa88lib.utils.short_class(entity)} does not have parent component')
-            return
-
-        if associated_component == design.rootComponent:
-            # There are no occurrences of root. Just a single instance: root. Can select the entity directly.
-            newSelection.add(entity)
-        else:
-            #Using _all_OccurrencesByComponent to get nested occurrences.
-            in_occurrences = design.rootComponent.allOccurrencesByComponent(associated_component)
-            if hasattr(entity, 'createForAssemblyContext'):
-                for occurrence in in_occurrences:
-                    proxy = entity.createForAssemblyContext(occurrence)
-                    newSelection.add(proxy)
-            elif hasattr(entity, 'bodies'):
-                # Workaround for Feature objects
-                ### TODO: Correctly select Feature objects. E.g. BoxFeature, CylinderFeature, ...
-                ###       so that editing them works.
-                for body in entity.bodies:
-                    for occurrence in in_occurrences:
-                        proxy = body.createForAssemblyContext(occurrence)
-                        newSelection.add(proxy)
-
-        try:
-            ui_.activeSelections.all = newSelection
-        except RuntimeError as e:
-            print(f'{NAME} failed to select {thomasa88lib.utils.short_class(entity)}: {e}')
-    elif rename.rename_type == RenameType.TEXT_COMMAND:
-        #neu_ui.add_selection(rename.name_obj) # Need "valid JSON" for this
-        # Commands.Select seems to only accept an ONK (path)
-        # Selections.Add seems to accept an ONK (path), an entity ID or entity ref (name)(?)
-        app_.executeTextCommand(f'Selections.Add {rename.name_obj}')
-        #app_.executeTextCommand(f'Commands.Select "ONK::*/*/VisualAnalyses/SectionViewAnalysis=0"')
 
 def try_rename_objects(inputs):
     failures = []
