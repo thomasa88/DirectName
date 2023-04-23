@@ -23,15 +23,16 @@ A naming dialog will be shown automatically when new features are created.
 
 Press Tab to navigate the inputs and press Enter when done. Press Esc to skip naming.
 
-The object which name is being edited will be highlighted (Object does not get highlighted before an edit is made, due to Fusion 360™ API limitations.)
-
 Enable/disable the naming dialog by clicking on the *DIRECTNAME* button under the *TOOLS* tab.
 
-The add-in can be temporarily disabled using the *Scripts and Add-ins* dialog. Press *Shift+S* in Fusion 360™ and go to the *Add-Ins* tab.
+The *DIRECTNAME* menu allows you to select what types of elements that will trigger the naming prompt.
+
+![Screenshot](screenshot_menu.png)
+
+The add-in can be disabled using the *Scripts and Add-ins* dialog. Press *Shift+S* in Fusion 360™ and go to the *Add-Ins* tab.
 
 ## Known Limitations
 
-* Highlighting of objects are delayed until the name is edited, if navigating with the keyboard.
 * Direct Edit mode is not supported.
 * DirectName loses track of changes when switching documents while creating a feature.
 
@@ -51,6 +52,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.3.0 (April 2023)
+  * Options to only name certain types of elements.
 * v 1.2.2
   * Remove highlighting of features, to fix "InternalValidationError : selecCmd" error.
 * v 1.2.1
