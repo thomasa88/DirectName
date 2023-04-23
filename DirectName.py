@@ -80,6 +80,7 @@ FILTER_CMD_DEF_ID_BASE = 'thomasa88_DirectNameFilter'
 
 # Heuristic to find new bodies
 UNNAMED_BODY_PATTERN = re.compile('(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
+UNNAMED_COMP_PATTERN = re.compile('(?:Component)\d+')
 
 RENAME_FILTER_OPTIONS = [
     ('nameComponents', 'Components (from Body)'),
@@ -262,12 +263,14 @@ def check_timeline(init=False):
                         label = entity_type.replace('Feature', '')
                         if entity_type == 'Occurrence':
                             occur_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
-                            if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
-                                # Only the "Component from bodies" feature can be renamed
+                            print("O", occur_type)
+                            if (occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP or
+                                occur_type == thomasa88lib.timeline.OCCURRENCE_NEW_COMP):
+                                # Only the "Component from bodies" feature can be renamed ...
                                 if settings_['nameFeatures']:
                                     rename_objs.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
                             
-                                # In fact, it only makes sense to rename that timeline feature:
+                                # ... In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
                                 #   forced onto the timeline object.
                                 # * Copy component means that the component already has a name.
