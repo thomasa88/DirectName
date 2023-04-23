@@ -50,6 +50,7 @@ from .thomasa88lib import timeline
 from .thomasa88lib import manifest
 from .thomasa88lib import error
 from .thomasa88lib import settings
+from .thomasa88lib import commands
 
 # Force modules to be fresh during development
 import importlib
@@ -59,6 +60,7 @@ importlib.reload(thomasa88lib.timeline)
 importlib.reload(thomasa88lib.manifest)
 importlib.reload(thomasa88lib.error)
 importlib.reload(thomasa88lib.settings)
+importlib.reload(thomasa88lib.commands)
 
 class RenameType:
     API = 1
@@ -74,9 +76,18 @@ class RenameInfo:
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 PANEL_ID = 'thomasa88_DirectNamePanel'
 ENABLE_CMD_DEF_ID = 'thomasa88_DirectNameEnable'
+FILTER_CMD_DEF_ID_BASE = 'thomasa88_DirectNameFilter'
 
 # Heuristic to find new bodies
 UNNAMED_BODY_PATTERN = re.compile('(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
+
+RENAME_FILTER_OPTIONS = [
+    ('nameComponents', 'Components (from Body)'),
+    ('nameSections', 'Cross Sections'),
+    ('nameBodies', 'Bodies/Surfaces'),
+    ('nameFeatures', 'Features'),
+    ('nameSketches', 'Sketches'),
+]
 
 app_ = None
 ui_ = None
@@ -84,9 +95,9 @@ ui_ = None
 error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False, msg_prefix=NAME)
 events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
-settings_ = thomasa88lib.settings.SettingsManager(
-    { 'enabled': True }
-)
+default_settings = { 'enabled': True }
+default_settings.update({ f[0]: True for f in RENAME_FILTER_OPTIONS })
+settings_ = thomasa88lib.settings.SettingsManager(default_settings)
 
 need_init_ = True
 last_flat_timeline_ = None
@@ -94,7 +105,7 @@ rename_cmd_def_ = None
 enable_cmd_def_ = None
 rename_objs_ = None
 command_terminated_handler_info_ = None
-panel_ = None
+panel_: adsk.core.ToolbarPanel = None
 
 def set_enabled(value):
     settings_['enabled'] = value
@@ -181,9 +192,10 @@ def after_terminate_handler(command_id):
                 section_id = neu_modeling.get_child(analysis_entity_id, i)['entityId']
                 section_properties = neu_server.get_entity_properties(section_id)
                 if section_properties['userName'] == '':
-                    rename_info = RenameInfo("Section", section_id, section_id, RenameType.TEXT_COMMAND)
-                    rename_objs_ = [ rename_info ]
-                    rename_cmd_def_.execute()
+                    if settings_['nameSections']:
+                        rename_info = RenameInfo("Section", section_id, section_id, RenameType.TEXT_COMMAND)
+                        rename_objs_ = [ rename_info ]
+                        rename_cmd_def_.execute()
                     break
         else:
             rename_objs_ = check_timeline()
@@ -252,17 +264,22 @@ def check_timeline(init=False):
                             occur_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
                             if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
                                 # Only the "Component from bodies" feature can be renamed
-                                rename_objs.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
+                                if settings_['nameFeatures']:
+                                    rename_objs.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
                             
                                 # In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
                                 #   forced onto the timeline object.
                                 # * Copy component means that the component already has a name.
                                 # Let the user name the component:
-                                rename_objs.append(RenameInfo("Component", entity.component, entity.component))
+                                if settings_['nameComponents']:
+                                    rename_objs.append(RenameInfo("Component", entity.component, entity.component))
                         else:
-                            rename_objs.append(RenameInfo(label, timeline_obj, entity))
-                            if hasattr(entity, 'bodies'):
+                            sketch = adsk.fusion.Sketch.cast(entity)
+                            if ((sketch and settings_['nameSketches']) or 
+                                (not sketch and settings_['nameFeatures'])):
+                                rename_objs.append(RenameInfo(label, timeline_obj, entity))
+                            if hasattr(entity, 'bodies') and settings_['nameBodies']:
                                 for body in entity.bodies:
                                     # We cannot see if a body is newly created by this feature or already existed(?)
                                     # Using a heuristic to catch all unnamed bodies. Possibly change to tracking the
@@ -270,9 +287,10 @@ def check_timeline(init=False):
                                     if UNNAMED_BODY_PATTERN.match(body.name):
                                         rename_objs.append(RenameInfo(label + ' Body', body, body))
                     else:
-                        # re: Move1 -> Move
-                        label = re.sub(r'[0-9].*', '', timeline_obj.name)
-                        rename_objs.append(RenameInfo(label, timeline_obj, None))
+                        if settings_['nameFeatures']:
+                            # re: Move1 -> Move
+                            label = re.sub(r'[0-9].*', '', timeline_obj.name)
+                            rename_objs.append(RenameInfo(label, timeline_obj, None))
 
     last_flat_timeline_ = current_flat_timeline
     return rename_objs
@@ -377,6 +395,12 @@ def enable_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     global need_init_
     need_init_ = True
 
+def filter_check_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
+    cmd_def = args.command.parentCommandDefinition
+    ctl_def: adsk.core.CheckBoxControlDefinition = cmd_def.controlDefinition
+    # Get setting name based on command ID. Not very beautiful, but it works.
+    settings_[cmd_def.id.replace(FILTER_CMD_DEF_ID_BASE, '')] = ctl_def.isChecked    
+
 def update_enable_button():
     if get_enabled():
         state_text = 'enabled'
@@ -436,6 +460,16 @@ def run(context):
         enable_control = panel_.controls.addCommand(enable_cmd_def_)
         enable_control.isPromoted = True
         enable_control.isPromotedByDefault = True
+
+        panel_.controls.addSeparator()
+
+        for filter_id, filter_name in RENAME_FILTER_OPTIONS:
+            filter_cmd_def = thomasa88lib.commands.recreate_checkbox_def(
+                FILTER_CMD_DEF_ID_BASE + filter_id,
+                filter_name, f'Show a prompt to name {filter_name} when they are created.',
+                settings_[filter_id])
+            panel_.controls.addCommand(filter_cmd_def)
+            events_manager_.add_handler(filter_cmd_def.commandCreated, callback=filter_check_command_created_handler)
 
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
                                     callback=rename_command_created_handler)
