@@ -414,7 +414,7 @@ def update_enable_button():
     
     # Note: Name must be updated for icon to change!
     # And the name must be set on the controlDefinition!
-    enable_cmd_def_.controlDefinition.name = f'Enable/Disable {NAME}'
+    enable_cmd_def_.controlDefinition.name = f'Enable/Disable {NAME} (v {manifest_["version"]})'
 
 def run(context):
     global app_
