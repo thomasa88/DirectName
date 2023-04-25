@@ -67,10 +67,9 @@ class RenameType:
     TEXT_COMMAND = 2
 
 class RenameInfo:
-    def __init__(self, label, name_obj, select_obj, rename_type=RenameType.API):
+    def __init__(self, label, name_obj, rename_type=RenameType.API):
         self.label = label
         self.name_obj = name_obj
-        self.select_obj = select_obj
         self.rename_type = rename_type
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
@@ -193,7 +192,7 @@ def after_terminate_handler(command_id):
                 section_properties = neu_server.get_entity_properties(section_id)
                 if section_properties['userName'] == '':
                     if settings_['nameSections']:
-                        rename_info = RenameInfo("Section", section_id, section_id, RenameType.TEXT_COMMAND)
+                        rename_info = RenameInfo("Section", section_id, RenameType.TEXT_COMMAND)
                         rename_objs_ = [ rename_info ]
                         rename_cmd_def_.execute()
                     break
@@ -265,7 +264,7 @@ def check_timeline(init=False):
                             if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
                                 # Only the "Component from bodies" feature can be renamed
                                 if settings_['nameFeatures']:
-                                    rename_objs.append(RenameInfo(label, timeline_obj, timeline_obj.entity))
+                                    rename_objs.append(RenameInfo(label, timeline_obj))
                             
                                 # In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
@@ -273,24 +272,24 @@ def check_timeline(init=False):
                                 # * Copy component means that the component already has a name.
                                 # Let the user name the component:
                                 if settings_['nameComponents']:
-                                    rename_objs.append(RenameInfo("Component", entity.component, entity.component))
+                                    rename_objs.append(RenameInfo("Component", entity.component))
                         else:
                             sketch = adsk.fusion.Sketch.cast(entity)
                             if ((sketch and settings_['nameSketches']) or 
                                 (not sketch and settings_['nameFeatures'])):
-                                rename_objs.append(RenameInfo(label, timeline_obj, entity))
+                                rename_objs.append(RenameInfo(label, timeline_obj))
                             if hasattr(entity, 'bodies') and settings_['nameBodies']:
                                 for body in entity.bodies:
                                     # We cannot see if a body is newly created by this feature or already existed(?)
                                     # Using a heuristic to catch all unnamed bodies. Possibly change to tracking the
                                     # component tree (i.e. what is shown in the Browser).
                                     if UNNAMED_BODY_PATTERN.match(body.name):
-                                        rename_objs.append(RenameInfo(label + ' Body', body, body))
+                                        rename_objs.append(RenameInfo(label + ' Body', body))
                     else:
                         if settings_['nameFeatures']:
                             # re: Move1 -> Move
                             label = re.sub(r'[0-9].*', '', timeline_obj.name)
-                            rename_objs.append(RenameInfo(label, timeline_obj, None))
+                            rename_objs.append(RenameInfo(label, timeline_obj))
 
     last_flat_timeline_ = current_flat_timeline
     return rename_objs
