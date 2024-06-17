@@ -161,7 +161,10 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
         # self
         return
 
-    if app_.activeEditObject.classType() == 'adsk::fusion::Sketch':
+    # Issue #11: app_.activeEditObject gives "RuntimeError: 2 : InternalValidationError : res" in the Flat Pattern environment,
+    # but calling it on "design" works.
+    design = adsk.fusion.Design.cast(app_.activeProduct)
+    if design and design.activeEditObject.classType() == 'adsk::fusion::Sketch':
         # Don't activate inside Sketch edit mode, e.g. when the user deletes a line or
         # runs a Mirror command.
         # Alternative: Track SketchActivate, SketchStop and UndoCommand (note that

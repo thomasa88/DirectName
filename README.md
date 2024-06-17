@@ -52,6 +52,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.3.1 (June 2024)
+  * Fix error pop-ups in Flat Pattern editor. #11
 * v 1.3.0 (April 2023)
   * Options to only name certain types of elements.
 * v 1.2.2
