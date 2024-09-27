@@ -138,7 +138,8 @@ def stop_monitoring():
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
-    #print("TERM", args.commandId, args.terminationReason, app_.activeEditObject.classType())
+    # app_.log(f"Terminated command: {args.commandId}, reason: {args.terminationReason}, object: {app_.activeEditObject.classType()}",
+    #          adsk.core.LogLevels.ErrorLogLevel, adsk.core.LogTypes.ConsoleLogType)
 
     global need_init_
     if need_init_:
@@ -154,7 +155,12 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
         return
 
     # Heavy traffic commands
-    if args.commandId in ['SelectCommand', 'CommitCommand']:
+    if args.commandId in ['SelectCommand',
+                          'CommitCommand',
+                          'PanCommand',
+                          'FreeOrbitCommand',
+                          'ActivateEnvironmentCommand',
+                          'VisibilityToggleCmd']:
         return
 
     if args.commandId == SET_NAME_CMD_ID:
