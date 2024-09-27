@@ -228,6 +228,10 @@ def check_timeline(init=False):
         # to detect change.
         # However, we know that the last addition should be just before the
         # rollback bar.
+        # Update 2024-09-27: Undo and redo actually triggers Undo/Redo(DropDown)
+        # commands now. One command is sent even if one undos or redoes multiple
+        # commands at once using the dropdown. It will need som careful thinking
+        # to optimize based on incoming undo/redo. 
         last_new_obj = None
         index = 0
         for next_index, next_obj in enumerate(current_flat_timeline):
