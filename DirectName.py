@@ -34,13 +34,13 @@ import neu_modeling
 import os
 import re
 import sys
-
-### TODO:
-### Option to name new bodies, views etc?
+import platform
 
 NAME = 'DirectName'
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
+OS = platform.system()
+IS_WINDOWS = (OS == 'Windows')
 
 # Must import lib as unique name, to avoid collision with other versions
 # loaded by other add-ins
@@ -51,6 +51,8 @@ from .thomasa88lib import manifest
 from .thomasa88lib import error
 from .thomasa88lib import settings
 from .thomasa88lib import commands
+if IS_WINDOWS:
+    from .thomasa88lib.win import input
 
 # Force modules to be fresh during development
 import importlib
@@ -61,6 +63,8 @@ importlib.reload(thomasa88lib.manifest)
 importlib.reload(thomasa88lib.error)
 importlib.reload(thomasa88lib.settings)
 importlib.reload(thomasa88lib.commands)
+if IS_WINDOWS:
+    importlib.reload(thomasa88lib.win.input)
 
 class RenameType:
     API = 1
@@ -138,8 +142,7 @@ def stop_monitoring():
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
-    # app_.log(f"Terminated command: {args.commandId}, reason: {args.terminationReason}, object: {app_.activeEditObject.classType()}",
-    #          adsk.core.LogLevels.ErrorLogLevel, adsk.core.LogTypes.ConsoleLogType)
+    # app_.log(f"Terminated command: {args.commandId}, reason: {args.terminationReason}, object: {app_.activeEditObject.classType()}")
 
     global need_init_
     if need_init_:
@@ -326,7 +329,19 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
                                 callback=rename_command_destroy_handler)
     
     inputs = cmd.commandInputs
-    inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
+
+    # Automatically focus the first input box
+    auto_focused = False
+    if IS_WINDOWS:
+        try:
+            thomasa88lib.win.input.press_key(thomasa88lib.win.input.VK_TAB)
+            auto_focused = True
+        except Exception as e:
+            app_.log(f"DirectName auto-focus failed: {e}")
+    # Mac solution might be possible with `osascript -e 'tell application "System Events" to key code 48'`
+    # (Or `keystroke (ASCII character 9)`) 
+    if not auto_focused:
+        inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
 
     # Using a table, since it will trigger inputChanged when the user uses the mouse to focus
     # an input. Unfortunately, it does not trigger on focus change made by the keyboard.
@@ -348,6 +363,9 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
 
     cmd.okButtonText = 'Set name (Enter)'
     cmd.cancelButtonText = 'Skip (Esc)'
+
+    # if IS_WINDOWS:
+    #     thomasa88lib.win.input.press_key(thomasa88lib.win.input.VK_TAB)
 
 def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
     cmd = args.command
