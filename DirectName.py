@@ -78,7 +78,7 @@ ENABLE_CMD_DEF_ID = 'thomasa88_DirectNameEnable'
 FILTER_CMD_DEF_ID_BASE = 'thomasa88_DirectNameFilter'
 
 # Heuristic to find new bodies
-UNNAMED_BODY_PATTERN = re.compile('(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
+UNNAMED_BODY_PATTERN = re.compile(r'(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
 
 RENAME_FILTER_OPTIONS = [
     ('nameComponents', 'Components (from Body)'),
