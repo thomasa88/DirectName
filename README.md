@@ -11,11 +11,19 @@ DirectName is an Autodesk® Fusion 360™ add-in for naming features and bodies 
 
 ## Installation
 
+The add-in can be downloaded directly from GitHub or installed using an installer created by Autodesk. Only use one of the installation methods at a time.
+
+### From GitHub
+
 Download the add-in from the [Releases](https://github.com/thomasa88/DirectName/releases) page.
 
 Unpack it into `API\AddIns` (see [How to install an add-in or script in Fusion 360](https://knowledge.autodesk.com/support/fusion-360/troubleshooting/caas/sfdcarticles/sfdcarticles/How-to-install-an-ADD-IN-and-Script-in-Fusion-360.html)).
 
 Make sure the directory is named `DirectName`, with no suffix.
+
+### From Autodesk App store
+
+Download the installer for your OS at https://apps.autodesk.com/FUSION/en/Detail/Index?id=7497198800232664541 .
 
 ## Usage
 
