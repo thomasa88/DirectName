@@ -60,6 +60,10 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.4.0 (October 2024)
+  * Fix lag when navigating in Fusion. #12
+  * Auto-focus first text box (Windows only). #13
+  * Fix syntax error in algorithm finding new bodies.
 * v 1.3.1 (June 2024)
   * Fix error pop-ups in Flat Pattern editor. #11
 * v 1.3.0 (April 2023)
