@@ -215,11 +215,11 @@ def after_terminate_handler(command_id):
                         rename_cmd_def_.execute()
                     break
         else:
-            rename_objs_ = check_timeline()
+            rename_objs_ = check_timeline(trigger_cmd_id=command_id)
             if rename_objs_:
                 rename_cmd_def_.execute()
 
-def check_timeline(init=False):
+def check_timeline(init=False, trigger_cmd_id=None):
     global last_flat_timeline_
     #print("CHECK", not init)
     rename_objs = []
@@ -283,16 +283,22 @@ def check_timeline(init=False):
                         label = entity_type.replace('Feature', '')
                         if entity_type == 'Occurrence':
                             occur_type = thomasa88lib.timeline.get_occurrence_type(timeline_obj)
-                            if occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP:
-                                # Only the "Component from bodies" feature can be renamed
-                                if settings_['nameFeatures']:
-                                    rename_objs.append(RenameInfo(label, timeline_obj))
-                            
+                            # "New Component" lets the user name the component in its down dialog,
+                            # but New Component in Extrude does not have a naming dialog, so try
+                            # to catch that by checking what command triggered the timeline check.
+                            if (occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP or
+                                (occur_type == thomasa88lib.timeline.OCCURRENCE_NEW_COMP and
+                                trigger_cmd_id != 'FusionCreateNewComponentCommand')):
+                                # Only the "Component from bodies" timeline feature can be renamed
                                 # In fact, it only makes sense to rename that timeline feature:
                                 # * New empty component already has a name field and it is
                                 #   forced onto the timeline object.
                                 # * Copy component means that the component already has a name.
-                                # Let the user name the component:
+                                # Let the user name the timeline feature:
+                                if (occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP
+                                    and settings_['nameFeatures']):
+                                    rename_objs.append(RenameInfo("Create Comp", timeline_obj))
+                            
                                 if settings_['nameComponents']:
                                     rename_objs.append(RenameInfo("Component", entity.component))
                         else:

@@ -64,6 +64,7 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
   * Fix lag when navigating in Fusion. #12
   * Auto-focus first text box (Windows only). #13
   * Button to copy name down to text boxes below.
+  * Show dialog after creating a component as part of Extrude. #3
   * Fix syntax error in algorithm finding new bodies.
 * v 1.3.1 (June 2024)
   * Fix error pop-ups in Flat Pattern editor. #11
