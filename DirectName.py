@@ -163,7 +163,13 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
                           'PanCommand',
                           'FreeOrbitCommand',
                           'ActivateEnvironmentCommand',
-                          'VisibilityToggleCmd']:
+                          'VisibilityToggleCmd',
+                          # Workaround for command after creation command making the
+                          # list of renamed objects empty, resulting in an empty dialog.
+                          # If this happens for anything else than "New Component", we
+                          # should find a fix (hold-off?).
+                          'FindInBrowser',
+                          ]:
         return
 
     if args.commandId == SET_NAME_CMD_ID:
