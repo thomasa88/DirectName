@@ -321,32 +321,26 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
 
     events_manager_.add_handler(cmd.execute,
                                 callback=rename_command_execute_handler)
-    
     events_manager_.add_handler(cmd.executePreview,
                                 callback=rename_command_execute_preview_handler)
-
     events_manager_.add_handler(cmd.destroy,
                                 callback=rename_command_destroy_handler)
+    events_manager_.add_handler(cmd.inputChanged,
+                                callback=rename_command_input_changed_handler)
     
     inputs = cmd.commandInputs
 
     # Automatically focus the first input box
-    auto_focused = False
-    if IS_WINDOWS:
-        try:
-            thomasa88lib.win.input.press_key(thomasa88lib.win.input.VK_TAB)
-            auto_focused = True
-        except Exception as e:
-            app_.log(f"DirectName auto-focus failed: {e}")
-    # Mac solution might be possible with `osascript -e 'tell application "System Events" to key code 48'`
-    # (Or `keystroke (ASCII character 9)`) 
+    auto_focused = press_tab() 
     if not auto_focused:
         inputs.addTextBoxCommandInput('info', '', 'Press Tab to focus on the textbox.', 1, True)
 
     # Using a table, since it will trigger inputChanged when the user uses the mouse to focus
     # an input. Unfortunately, it does not trigger on focus change made by the keyboard.
-    table = inputs.addTableCommandInput('table', '', 2, '2:3')
+    table = inputs.addTableCommandInput('table', '', 3, '8:12:1')
     table.tablePresentationStyle = adsk.core.TablePresentationStyles.transparentBackgroundTablePresentationStyle
+    table.minimumVisibleRows = min(len(rename_objs_), 1)
+    table.maximumVisibleRows = 20
 
     for i, rename in enumerate(rename_objs_):
         label_input = table.commandInputs.addStringValueInput(f'label_{i}', '', rename.label)
@@ -360,12 +354,27 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
         string_input = table.commandInputs.addStringValueInput(f'string_{i}', rename.label, obj_name)
         table.addCommandInput(label_input, i, 0)
         table.addCommandInput(string_input, i, 1)
+        if i < len(rename_objs_) - 1:
+            copy_btn = table.commandInputs.addBoolValueInput(f'copy_{i}', "Copy down", False, './resources/copy_down')
+            table.addCommandInput(copy_btn, i, 2)
 
     cmd.okButtonText = 'Set name (Enter)'
     cmd.cancelButtonText = 'Skip (Esc)'
 
-    # if IS_WINDOWS:
-    #     thomasa88lib.win.input.press_key(thomasa88lib.win.input.VK_TAB)
+def press_tab(times=1):
+    return press_key(thomasa88lib.win.input.VK_TAB, times)
+
+def press_key(key_code, times=1):
+    ok = False
+    if IS_WINDOWS:
+        try:
+            thomasa88lib.win.input.press_keys([key_code] * times)
+            ok = True
+        except Exception as e:
+            app_.log(f"DirectName auto-focus failed: {e}")
+    # Mac solution might be possible with `osascript -e 'tell application "System Events" to key code 48'`
+    # (Or `keystroke (ASCII character 9)`)
+    return ok
 
 def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
     cmd = args.command
@@ -387,6 +396,37 @@ def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
 def rename_command_execute_preview_handler(args: adsk.core.CommandEventArgs):
     failures = try_rename_objects(args.command.commandInputs)
     args.isValidResult = not failures
+
+skip_one = True
+def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
+    name, _, idx_str = args.input.id.partition('_')
+    if name == 'copy':
+        # Every "button" click results in two events.
+        # We cannot trust input.value to use as event filter, so just ignore
+        # every second event.
+        global skip_one
+        if skip_one:
+            skip_one = not skip_one
+            return
+        skip_one = not skip_one
+        src_idx = int(idx_str)
+        src_text = args.inputs.itemById(f'string_{src_idx}').value
+        for i in range(src_idx + 1, len(rename_objs_)):
+            args.inputs.itemById(f'string_{i}').value = src_text
+        # Focus the first text box to which data was copied to,
+        # in case the user wants to edit the value to have almost the same name.
+        # Focus is always restarted at the first text box after clicking a button.
+        if IS_WINDOWS:
+            for i in range(src_idx + 2):
+                # Fusion cannot keep up with the tab presses if we don't let it
+                # process events in-between. Twice..
+                adsk.doEvents()
+                adsk.doEvents()
+                press_tab()
+            # Put the selection marker at the end of the text
+            adsk.doEvents()
+            adsk.doEvents()
+            press_key(key_code=thomasa88lib.win.input.VK_RIGHT)
 
 def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
     # Update state
