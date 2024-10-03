@@ -66,6 +66,7 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
   * Button to copy name down to text boxes below.
   * Show dialog after creating a component as part of Extrude. #3
   * Fix syntax error in algorithm finding new bodies.
+  * Option to inherit component name for new bodies. #10
 * v 1.3.1 (June 2024)
   * Fix error pop-ups in Flat Pattern editor. #11
 * v 1.3.0 (April 2023)

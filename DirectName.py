@@ -80,6 +80,7 @@ SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 PANEL_ID = 'thomasa88_DirectNamePanel'
 ENABLE_CMD_DEF_ID = 'thomasa88_DirectNameEnable'
 FILTER_CMD_DEF_ID_BASE = 'thomasa88_DirectNameFilter'
+BODY_INHERIT_NAME_ID = 'thomasa88_DirectNameBodyInherit'
 
 # Heuristic to find new bodies
 UNNAMED_BODY_PATTERN = re.compile(r'(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
@@ -98,7 +99,7 @@ ui_ = None
 error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False, msg_prefix=NAME)
 events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
-default_settings = { 'enabled': True }
+default_settings = { 'enabled': True, 'bodyInheritName': False }
 default_settings.update({ f[0]: True for f in RENAME_FILTER_OPTIONS })
 settings_ = thomasa88lib.settings.SettingsManager(default_settings)
 
@@ -363,6 +364,16 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
             obj_name = neu_server.get_user_name(rename.name_obj)
         else:
             raise Exception(f"Unknown rename type: {rename.rename_type}")
+
+        if rename.rename_type == RenameType.API:
+            if settings_['nameBodies'] and settings_['bodyInheritName']:
+                obj = rename.name_obj
+                if isinstance(obj, adsk.fusion.BRepBody):
+                    parent_comp = obj.parentComponent
+                    design = adsk.fusion.Design.cast(app_.activeProduct)
+                    if design and parent_comp != design.rootComponent:
+                        obj_name = parent_comp.name
+
         string_input = table.commandInputs.addStringValueInput(f'string_{i}', rename.label, obj_name)
         table.addCommandInput(label_input, i, 0)
         table.addCommandInput(string_input, i, 1)
@@ -483,6 +494,11 @@ def filter_check_command_created_handler(args: adsk.core.CommandCreatedEventArgs
     # Get setting name based on command ID. Not very beautiful, but it works.
     settings_[cmd_def.id.replace(FILTER_CMD_DEF_ID_BASE, '')] = ctl_def.isChecked    
 
+def comp_body_inherit_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
+    cmd_def = args.command.parentCommandDefinition
+    ctl_def: adsk.core.CheckBoxControlDefinition = cmd_def.controlDefinition
+    settings_['bodyInheritName'] = ctl_def.isChecked
+
 def update_enable_button():
     if get_enabled():
         state_text = 'enabled'
@@ -552,6 +568,18 @@ def run(context):
                 settings_[filter_id])
             panel_.controls.addCommand(filter_cmd_def)
             events_manager_.add_handler(filter_cmd_def.commandCreated, callback=filter_check_command_created_handler)
+        
+        panel_.controls.addSeparator()
+
+        comp_body_inherit_def = thomasa88lib.commands.recreate_checkbox_def(
+            BODY_INHERIT_NAME_ID, 'Body name from component',
+            "Defaults the name of bodies to their parent component's name.\n\n"
+            "Does not apply to bodies in the root component."
+            " Bodies getting the same name will get a numeric suffix within parentheses.",
+            settings_['bodyInheritName']
+        )
+        panel_.controls.addCommand(comp_body_inherit_def)
+        events_manager_.add_handler(comp_body_inherit_def.commandCreated, callback=comp_body_inherit_command_created_handler)
 
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
                                     callback=rename_command_created_handler)
