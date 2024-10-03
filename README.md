@@ -1,6 +1,6 @@
 # ![](resources/rename_icon/32x32.png)DirectName
 
-DirectName is an Autodesk® Fusion 360™ add-in for naming features and bodies directly after creation. After creating a feature (e.g. *Extrude*) a dialog prompts for names for the feature and any created bodies.
+DirectName is an Autodesk® Fusion add-in for naming features and bodies directly after creation. After creating a feature (e.g. *Extrude*) a dialog prompts for names for the feature and any created bodies.
 
 ![Screenshot](screenshot.png)
 
@@ -37,7 +37,7 @@ The *DIRECTNAME* menu allows you to select what types of elements that will trig
 
 ![Screenshot](screenshot_menu.png)
 
-The add-in can be disabled using the *Scripts and Add-ins* dialog. Press *Shift+S* in Fusion 360™ and go to the *Add-Ins* tab.
+The add-in can be disabled using the *Scripts and Add-ins* dialog. Press *Shift+S* in Fusion and go to the *Add-Ins* tab.
 
 ## Known Limitations
 
