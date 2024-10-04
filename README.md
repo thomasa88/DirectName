@@ -60,6 +60,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.4.1 (October 2024)
+  * Option to set component description. #4
 * v 1.4.0 (October 2024)
   * Fix lag when navigating in Fusion. #12
   * Auto-focus first text box (Windows only). #13

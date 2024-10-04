@@ -71,10 +71,12 @@ class RenameType:
     TEXT_COMMAND = 2
 
 class RenameInfo:
-    def __init__(self, label, name_obj, rename_type=RenameType.API):
+    def __init__(self, label, name_obj,
+                 rename_type=RenameType.API, rename_field='name'):
         self.label = label
         self.name_obj = name_obj
         self.rename_type = rename_type
+        self.rename_field = rename_field
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 PANEL_ID = 'thomasa88_DirectNamePanel'
@@ -86,11 +88,12 @@ BODY_INHERIT_NAME_ID = 'thomasa88_DirectNameBodyInherit'
 UNNAMED_BODY_PATTERN = re.compile(r'(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
 
 RENAME_FILTER_OPTIONS = [
-    ('nameComponents', 'Components (from Body)'),
-    ('nameSections', 'Cross Sections'),
-    ('nameBodies', 'Bodies/Surfaces'),
-    ('nameFeatures', 'Features'),
-    ('nameSketches', 'Sketches'),
+    ('nameComponents', 'Components (from Body)', True),
+    ('nameCompDescrs', 'Component Descriptions', False),
+    ('nameSections', 'Cross Sections', True),
+    ('nameBodies', 'Bodies/Surfaces', True),
+    ('nameFeatures', 'Features', True),
+    ('nameSketches', 'Sketches', True),
 ]
 
 app_ = None
@@ -100,7 +103,7 @@ error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False, msg_pref
 events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
 default_settings = { 'enabled': True, 'bodyInheritName': False }
-default_settings.update({ f[0]: True for f in RENAME_FILTER_OPTIONS })
+default_settings.update({ f[0]: f[2] for f in RENAME_FILTER_OPTIONS })
 settings_ = thomasa88lib.settings.SettingsManager(default_settings)
 
 need_init_ = True
@@ -302,6 +305,9 @@ def check_timeline(init=False, trigger_cmd_id=None):
                             
                                 if settings_['nameComponents']:
                                     rename_objs.append(RenameInfo("Component", entity.component))
+                            if  occur_type in (thomasa88lib.timeline.OCCURRENCE_NEW_COMP, thomasa88lib.timeline.OCCURRENCE_BODIES_COMP):
+                                if settings_['nameCompDescrs']:
+                                    rename_objs.append(RenameInfo("Comp Descr", entity.component, rename_field='description'))
                         else:
                             sketch = adsk.fusion.Sketch.cast(entity)
                             if ((sketch and settings_['nameSketches']) or 
@@ -359,7 +365,7 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
         label_input = table.commandInputs.addStringValueInput(f'label_{i}', '', rename.label)
         label_input.isReadOnly = True
         if rename.rename_type == RenameType.API:
-            obj_name = rename.name_obj.name
+            obj_name = getattr(rename.name_obj, rename.rename_field)
         elif rename.rename_type == RenameType.TEXT_COMMAND:
             obj_name = neu_server.get_user_name(rename.name_obj)
         else:
@@ -462,8 +468,8 @@ def try_rename_objects(inputs):
         input = inputs.itemById(f'string_{i}')
         try:
             if rename.rename_type == RenameType.API:
-                if rename.name_obj.name != input.value:
-                    rename.name_obj.name = input.value
+                if getattr(rename.name_obj, rename.rename_field) != input.value:
+                    setattr(rename.name_obj, rename.rename_field, input.value)
             elif rename.rename_type == RenameType.TEXT_COMMAND:
                 if neu_server.get_user_name(rename.name_obj) != input.value:
                     neu_server.rename(rename.name_obj, input.value)
@@ -561,7 +567,7 @@ def run(context):
 
         panel_.controls.addSeparator()
 
-        for filter_id, filter_name in RENAME_FILTER_OPTIONS:
+        for filter_id, filter_name, _ in RENAME_FILTER_OPTIONS:
             filter_cmd_def = thomasa88lib.commands.recreate_checkbox_def(
                 FILTER_CMD_DEF_ID_BASE + filter_id,
                 filter_name, f'Show a prompt to name {filter_name} when they are created.',
