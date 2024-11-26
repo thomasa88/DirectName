@@ -60,6 +60,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.4.2 (November 2024)
+  * Fix error on Mac when naming dialog was opened. #14
 * v 1.4.1 (October 2024)
   * Option to set component description. #4
 * v 1.4.0 (October 2024)
