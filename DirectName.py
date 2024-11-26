@@ -391,7 +391,9 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     cmd.cancelButtonText = 'Skip (Esc)'
 
 def press_tab(times=1):
-    return press_key(thomasa88lib.win.input.VK_TAB, times)
+    if IS_WINDOWS:
+        return press_key(thomasa88lib.win.input.VK_TAB, times)
+    return False
 
 def press_key(key_code, times=1):
     ok = False
