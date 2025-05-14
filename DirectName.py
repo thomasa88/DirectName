@@ -26,11 +26,6 @@
 
 import adsk.core, adsk.fusion, adsk.cam, traceback
 
-# Text Commands. Python version.
-# neu_dev.list_functions()
-import neu_server
-import neu_modeling
-
 import os
 import re
 import sys
@@ -71,7 +66,7 @@ class RenameType:
     TEXT_COMMAND = 2
 
 class RenameInfo:
-    def __init__(self, label, name_obj,
+    def __init__(self, label: str, name_obj: adsk.core.Base | int,
                  rename_type=RenameType.API, rename_field='name'):
         self.label = label
         self.name_obj = name_obj
@@ -203,18 +198,18 @@ def after_terminate_handler(command_id):
     # Check that the user is not active in another command
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
         if command_id == 'FusionHalfSectionViewCommand':
-            analysis_entity_id = neu_server.get_entity_id("VisualAnalyses")
-            child_count = neu_modeling.get_child_count(analysis_entity_id)
+            # analysis_entity_id = app_.executeTextCommand('PEntity.ID VisualAnalyses')
+            child_count = int(app_.executeTextCommand('Managed.Children VisualAnalyses'))
             # Most likely the last child is the new one(?)
             for i in range(child_count - 1, -1, -1):
                 # neu_server.get_user_name() always gives a name
                 # properties['userName'] is empty if the user has not set it
                 # properties['creationIndex'] is the default index. E.g. In Section3 index is 3.
-                section_id = neu_modeling.get_child(analysis_entity_id, i)['entityId']
-                section_properties = neu_server.get_entity_properties(section_id)
+                entity_id: int = json.loads(app_.executeTextCommand(f'Managed.Child VisualAnalyses {i}'))['entityId']
+                section_properties = json.loads(app_.executeTextCommand(f'PEntity.Properties {entity_id}'))
                 if section_properties['userName'] == '':
                     if settings_['nameSections']:
-                        rename_info = RenameInfo("Section", section_id, RenameType.TEXT_COMMAND)
+                        rename_info = RenameInfo("Section", entity_id, RenameType.TEXT_COMMAND)
                         rename_objs_ = [ rename_info ]
                         rename_cmd_def_.execute()
                     break
@@ -367,7 +362,7 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
         if rename.rename_type == RenameType.API:
             obj_name = getattr(rename.name_obj, rename.rename_field)
         elif rename.rename_type == RenameType.TEXT_COMMAND:
-            obj_name = neu_server.get_user_name(rename.name_obj)
+            obj_name = app_.executeTextCommand(f'PInterfaces.GetUserName {rename.name_obj}')
         else:
             raise Exception(f"Unknown rename type: {rename.rename_type}")
 
@@ -473,8 +468,10 @@ def try_rename_objects(inputs):
                 if getattr(rename.name_obj, rename.rename_field) != input.value:
                     setattr(rename.name_obj, rename.rename_field, input.value)
             elif rename.rename_type == RenameType.TEXT_COMMAND:
-                if neu_server.get_user_name(rename.name_obj) != input.value:
-                    neu_server.rename(rename.name_obj, input.value)
+                if app_.executeTextCommand(f'PInterfaces.GetUserName {rename.name_obj}') != input.value:
+                    # The text command does not handle quotes
+                    new_name = input.value.replace('"', '')
+                    app_.executeTextCommand(f'PInterfaces.Rename {rename.name_obj} "{new_name}"')
             else:
                 raise Exception(f"Unknown rename type: {rename.rename_type}")
         except RuntimeError as e:
