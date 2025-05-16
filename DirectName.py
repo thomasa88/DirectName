@@ -30,8 +30,9 @@ import os
 import re
 import json
 import platform
+from datetime import datetime
 
-NAME = 'DirectName'
+ADDIN_NAME = 'DirectName'
 
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 OS = platform.system()
@@ -82,6 +83,7 @@ PANEL_ID = 'thomasa88_DirectNamePanel'
 ENABLE_CMD_DEF_ID = 'thomasa88_DirectNameEnable'
 FILTER_CMD_DEF_ID_BASE = 'thomasa88_DirectNameFilter'
 BODY_INHERIT_NAME_ID = 'thomasa88_DirectNameBodyInherit'
+TROUBLESHOOT_ID = 'thomasa88_DirectNameTroubleshoot'
 
 # Heuristic to find new bodies
 UNNAMED_BODY_PATTERN = re.compile(r'(?:Body|实体|Körper|ボディ|Corps|Corpo)\d+')
@@ -98,10 +100,10 @@ RENAME_FILTER_OPTIONS = [
 app_ = None
 ui_ = None
 
-error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False, msg_prefix=NAME)
+error_catcher_ = thomasa88lib.error.ErrorCatcher(msgbox_in_debug=False, msg_prefix=ADDIN_NAME)
 events_manager_ = thomasa88lib.events.EventsManager(error_catcher_)
 manifest_ = thomasa88lib.manifest.read()
-default_settings = { 'enabled': True, 'bodyInheritName': False }
+default_settings = { 'enabled': True, 'bodyInheritName': False, 'troubleshoot': False }
 default_settings.update({ f[0]: f[2] for f in RENAME_FILTER_OPTIONS })
 settings_ = thomasa88lib.settings.SettingsManager(default_settings)
 
@@ -112,12 +114,34 @@ enable_cmd_def_ = None
 rename_objs_: list[RenameInfo] = None
 command_terminated_handler_info_ = None
 panel_: adsk.core.ToolbarPanel = None
+# These often hit settings are loaded into bools to avoid degrading Fusion's performance
+enabled_: bool
+troubleshoot_: bool
 
 def set_enabled(value):
+    global enabled_
+    enabled_ = value
     settings_['enabled'] = value
 
 def get_enabled():
-    return settings_['enabled']
+    return enabled_
+
+def load_enabled():
+    global enabled_
+    enabled_ = settings_['enabled']
+
+def set_troubleshoot(value):
+    global troubleshoot_
+    troubleshoot_ = value
+    settings_['troubleshoot'] = value
+    log(f"Troubleshooting mode: {value}")
+
+def get_troubleshoot():
+    return troubleshoot_
+
+def load_troubleshoot():
+    global troubleshoot_
+    troubleshoot_ = settings_['troubleshoot']
 
 def workspace_activated_handler(args: adsk.core.WorkspaceEventArgs):
     global need_init_
@@ -145,7 +169,8 @@ def stop_monitoring():
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
-    # app_.log(f"Terminated command: {args.commandId}, reason: {args.terminationReason}, object: {app_.activeEditObject.classType()}")
+    if get_troubleshoot():
+        log(f"Terminated command: {args.commandId}, reason: {args.terminationReason}, object: {app_.activeEditObject.classType()}")
 
     global need_init_
     if need_init_:
@@ -217,13 +242,16 @@ def after_terminate_handler(command_id: str):
                         rename_cmd_def_.execute()
                     break
         else:
+            if get_troubleshoot():
+                log("Scanning timeline")
             rename_objs_ = check_timeline(trigger_cmd_id=command_id)
+            if get_troubleshoot():
+                log("Timeline scan complete")
             if rename_objs_:
                 rename_cmd_def_.execute()
 
 def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
     global last_flat_timeline_
-    #print("CHECK", not init)
     rename_objs = []
 
     status, timeline = thomasa88lib.timeline.get_timeline()
@@ -400,7 +428,7 @@ def press_key(key_code, times=1):
             thomasa88lib.win.input.press_keys([key_code] * times)
             ok = True
         except Exception as e:
-            app_.log(f"DirectName auto-focus failed: {e}")
+            log(f"DirectName auto-focus failed: {e}")
     # Mac solution might be possible with `osascript -e 'tell application "System Events" to key code 48'`
     # (Or `keystroke (ASCII character 9)`)
     return ok
@@ -417,7 +445,7 @@ def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
     if failures:
         # At least on operation failed
         args.executeFailed = True
-        args.executeFailedMessage = f"{NAME} failed. Failed to rename features:<ul>"
+        args.executeFailedMessage = f"{ADDIN_NAME} failed. Failed to rename features:<ul>"
         for old_name, new_name in failures:
             args.executeFailedMessage += f'<li>"{old_name}" -> "{new_name}"'
         args.executeFailedMessage += "</ul>"
@@ -507,6 +535,11 @@ def comp_body_inherit_command_created_handler(args: adsk.core.CommandCreatedEven
     ctl_def: adsk.core.CheckBoxControlDefinition = cmd_def.controlDefinition
     settings_['bodyInheritName'] = ctl_def.isChecked
 
+def troubleshoot_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
+    cmd_def = args.command.parentCommandDefinition
+    ctl_def: adsk.core.CheckBoxControlDefinition = cmd_def.controlDefinition
+    set_troubleshoot(ctl_def.isChecked)
+
 def update_enable_button():
     if get_enabled():
         state_text = 'enabled'
@@ -516,11 +549,11 @@ def update_enable_button():
         enable_cmd_def_.resourceFolder = './resources/rename_disabled'
     
     # Newline to add some spacing to the toolClip image.
-    enable_cmd_def_.tooltip = f'{NAME} is currently {state_text}.\n'
+    enable_cmd_def_.tooltip = f'{ADDIN_NAME} is currently {state_text}.\n'
     
     # Note: Name must be updated for icon to change!
     # And the name must be set on the controlDefinition!
-    enable_cmd_def_.controlDefinition.name = f'Enable/Disable {NAME} (v {manifest_["version"]})'
+    enable_cmd_def_.controlDefinition.name = f'Enable/Disable {ADDIN_NAME} (v {manifest_["version"]})'
 
 def run(context):
     global app_
@@ -532,6 +565,9 @@ def run(context):
         app_ = adsk.core.Application.get()
         ui_ = app_.userInterface
 
+        load_enabled()
+        load_troubleshoot()
+
         # Make sure an old version of this command is not running and blocking the "add"
         if ui_.activeCommand == SET_NAME_CMD_ID:
             ui_.terminateActiveCommand()
@@ -542,7 +578,7 @@ def run(context):
 
         # Use a Command to get a transaction when renaming
         rename_cmd_def_ = ui_.commandDefinitions.addButtonDefinition(SET_NAME_CMD_ID,
-                                                                    f'{NAME} (v {manifest_["version"]})',
+                                                                    f'{ADDIN_NAME} (v {manifest_["version"]})',
                                                                     '',
                                                                     './resources/rename_icon')
 
@@ -550,7 +586,7 @@ def run(context):
         panel_ = tab.toolbarPanels.itemById(PANEL_ID)
         if panel_:
             panel_.deleteMe()
-        panel_ = tab.toolbarPanels.add(PANEL_ID, f'{NAME}')
+        panel_ = tab.toolbarPanels.add(PANEL_ID, f'{ADDIN_NAME}')
 
         enable_cmd_def_ = ui_.commandDefinitions.itemById(ENABLE_CMD_DEF_ID)
         if enable_cmd_def_:
@@ -588,6 +624,16 @@ def run(context):
         )
         panel_.controls.addCommand(comp_body_inherit_def)
         events_manager_.add_handler(comp_body_inherit_def.commandCreated, callback=comp_body_inherit_command_created_handler)
+        
+        panel_.controls.addSeparator()
+
+        troubleshoot_def = thomasa88lib.commands.recreate_checkbox_def(
+            TROUBLESHOOT_ID, 'Troubleshooting mode',
+            "Makes the add-in log a lot of information for troubleshooting. This will make performance worse.",
+            get_troubleshoot()
+        )
+        panel_.controls.addCommand(troubleshoot_def)
+        events_manager_.add_handler(troubleshoot_def.commandCreated, callback=troubleshoot_command_created_handler)
 
         events_manager_.add_handler(rename_cmd_def_.commandCreated,
                                     callback=rename_command_created_handler)
@@ -611,3 +657,6 @@ def stop(context):
             cmd_def.deleteMe()
 
         panel_.deleteMe()
+
+def log(message: str, **kwargs):
+    app_.log(f'{datetime.now()} {ADDIN_NAME}: {message}', **kwargs)
