@@ -60,6 +60,8 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.4.3 (May 2025)
+  * Fix add-in not starting in Fusion Insider. #18
 * v 1.4.2 (November 2024)
   * Fix error on Mac when naming dialog was opened. #14
 * v 1.4.1 (October 2024)
