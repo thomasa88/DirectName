@@ -91,6 +91,7 @@ UNNAMED_BODY_PATTERN = re.compile(r'(?:Body|实体|Körper|ボディ|Corps|Corpo
 RENAME_FILTER_OPTIONS = [
     ('nameComponents', 'Components (from Body)', True),
     ('nameCompDescrs', 'Component Descriptions', False),
+    ('nameCompPartNums', 'Component Part Numbers', False),
     ('nameSections', 'Cross Sections', True),
     ('nameBodies', 'Bodies/Surfaces', True),
     ('nameFeatures', 'Features', True),
@@ -332,6 +333,8 @@ def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
                                 if settings_['nameComponents']:
                                     rename_objs.append(ApiRenameInfo("Component", entity.component))
                             if  occur_type in (thomasa88lib.timeline.OCCURRENCE_NEW_COMP, thomasa88lib.timeline.OCCURRENCE_BODIES_COMP):
+                                if settings_['nameCompPartNums']:
+                                    rename_objs.append(ApiRenameInfo("Comp Part no", entity.component, rename_field='partNumber'))
                                 if settings_['nameCompDescrs']:
                                     rename_objs.append(ApiRenameInfo("Comp Descr", entity.component, rename_field='description'))
                         else:

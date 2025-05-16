@@ -64,6 +64,7 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
   * Fix add-in not starting in Fusion Insider. #18
   * Fix error when exiting Fusion. #19
   * Troubleshooting mode, that logs add-in actions. #20
+  * Option to set component part number. #17
 * v 1.4.2 (November 2024)
   * Fix error on Mac when naming dialog was opened. #14
 * v 1.4.1 (October 2024)
