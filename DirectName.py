@@ -28,7 +28,7 @@ import adsk.core, adsk.fusion, adsk.cam, traceback
 
 import os
 import re
-import sys
+import json
 import platform
 
 NAME = 'DirectName'
@@ -61,17 +61,21 @@ importlib.reload(thomasa88lib.commands)
 if IS_WINDOWS:
     importlib.reload(thomasa88lib.win.input)
 
-class RenameType:
-    API = 1
-    TEXT_COMMAND = 2
-
 class RenameInfo:
-    def __init__(self, label: str, name_obj: adsk.core.Base | int,
-                 rename_type=RenameType.API, rename_field='name'):
+    def __init__(self, label: str):
         self.label = label
+
+class ApiRenameInfo(RenameInfo):
+    def __init__(self, label: str, name_obj: adsk.core.Base,
+                 rename_field='name'):
+        super().__init__(label)
         self.name_obj = name_obj
-        self.rename_type = rename_type
         self.rename_field = rename_field
+
+class TextCmdRenameInfo(RenameInfo):
+    def __init__(self, label: str, entity_id: int):
+        super().__init__(label)
+        self.entity_id = entity_id
 
 SET_NAME_CMD_ID = 'thomasa88_setFeatureName'
 PANEL_ID = 'thomasa88_DirectNamePanel'
@@ -105,7 +109,7 @@ need_init_ = True
 last_flat_timeline_ = None
 rename_cmd_def_ = None
 enable_cmd_def_ = None
-rename_objs_ = None
+rename_objs_: list[RenameInfo] = None
 command_terminated_handler_info_ = None
 panel_: adsk.core.ToolbarPanel = None
 
@@ -192,13 +196,12 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     # Therefore, let's put ourselves at the end of the event queue.
     events_manager_.delay(lambda: after_terminate_handler(args.commandId))
 
-def after_terminate_handler(command_id):
+def after_terminate_handler(command_id: str):
     global need_init_
     global rename_objs_
     # Check that the user is not active in another command
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
         if command_id == 'FusionHalfSectionViewCommand':
-            # analysis_entity_id = app_.executeTextCommand('PEntity.ID VisualAnalyses')
             child_count = int(app_.executeTextCommand('Managed.Children VisualAnalyses'))
             # Most likely the last child is the new one(?)
             for i in range(child_count - 1, -1, -1):
@@ -209,7 +212,7 @@ def after_terminate_handler(command_id):
                 section_properties = json.loads(app_.executeTextCommand(f'PEntity.Properties {entity_id}'))
                 if section_properties['userName'] == '':
                     if settings_['nameSections']:
-                        rename_info = RenameInfo("Section", entity_id, RenameType.TEXT_COMMAND)
+                        rename_info = TextCmdRenameInfo("Section", entity_id)
                         rename_objs_ = [ rename_info ]
                         rename_cmd_def_.execute()
                     break
@@ -218,7 +221,7 @@ def after_terminate_handler(command_id):
             if rename_objs_:
                 rename_cmd_def_.execute()
 
-def check_timeline(init=False, trigger_cmd_id=None):
+def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
     global last_flat_timeline_
     #print("CHECK", not init)
     rename_objs = []
@@ -296,30 +299,30 @@ def check_timeline(init=False, trigger_cmd_id=None):
                                 # Let the user name the timeline feature:
                                 if (occur_type == thomasa88lib.timeline.OCCURRENCE_BODIES_COMP
                                     and settings_['nameFeatures']):
-                                    rename_objs.append(RenameInfo("Create Comp", timeline_obj))
+                                    rename_objs.append(ApiRenameInfo("Create Comp", timeline_obj))
                             
                                 if settings_['nameComponents']:
-                                    rename_objs.append(RenameInfo("Component", entity.component))
+                                    rename_objs.append(ApiRenameInfo("Component", entity.component))
                             if  occur_type in (thomasa88lib.timeline.OCCURRENCE_NEW_COMP, thomasa88lib.timeline.OCCURRENCE_BODIES_COMP):
                                 if settings_['nameCompDescrs']:
-                                    rename_objs.append(RenameInfo("Comp Descr", entity.component, rename_field='description'))
+                                    rename_objs.append(ApiRenameInfo("Comp Descr", entity.component, rename_field='description'))
                         else:
                             sketch = adsk.fusion.Sketch.cast(entity)
                             if ((sketch and settings_['nameSketches']) or 
                                 (not sketch and settings_['nameFeatures'])):
-                                rename_objs.append(RenameInfo(label, timeline_obj))
+                                rename_objs.append(ApiRenameInfo(label, timeline_obj))
                             if hasattr(entity, 'bodies') and settings_['nameBodies']:
                                 for body in entity.bodies:
                                     # We cannot see if a body is newly created by this feature or already existed(?)
                                     # Using a heuristic to catch all unnamed bodies. Possibly change to tracking the
                                     # component tree (i.e. what is shown in the Browser).
                                     if UNNAMED_BODY_PATTERN.match(body.name):
-                                        rename_objs.append(RenameInfo(label + ' Body', body))
+                                        rename_objs.append(ApiRenameInfo(label + ' Body', body))
                     else:
                         if settings_['nameFeatures']:
                             # re: Move1 -> Move
                             label = re.sub(r'[0-9].*', '', timeline_obj.name)
-                            rename_objs.append(RenameInfo(label, timeline_obj))
+                            rename_objs.append(ApiRenameInfo(label, timeline_obj))
 
     last_flat_timeline_ = current_flat_timeline
     return rename_objs
@@ -359,14 +362,14 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     for i, rename in enumerate(rename_objs_):
         label_input = table.commandInputs.addStringValueInput(f'label_{i}', '', rename.label)
         label_input.isReadOnly = True
-        if rename.rename_type == RenameType.API:
+        if isinstance(rename, ApiRenameInfo):
             obj_name = getattr(rename.name_obj, rename.rename_field)
-        elif rename.rename_type == RenameType.TEXT_COMMAND:
-            obj_name = app_.executeTextCommand(f'PInterfaces.GetUserName {rename.name_obj}')
+        elif isinstance(rename, TextCmdRenameInfo):
+            obj_name = app_.executeTextCommand(f'PInterfaces.GetUserName {rename.entity_id}')
         else:
-            raise Exception(f"Unknown rename type: {rename.rename_type}")
+            raise Exception(f"Unknown rename type: {type(rename)}")
 
-        if rename.rename_type == RenameType.API:
+        if isinstance(rename, ApiRenameInfo):
             if settings_['nameBodies'] and settings_['bodyInheritName']:
                 obj = rename.name_obj
                 if isinstance(obj, adsk.fusion.BRepBody):
@@ -463,23 +466,23 @@ def try_rename_objects(inputs):
 
     for i, rename in enumerate(rename_objs_):
         input = inputs.itemById(f'string_{i}')
-        try:
-            if rename.rename_type == RenameType.API:
+        if isinstance(rename, ApiRenameInfo):
+            try:
                 if getattr(rename.name_obj, rename.rename_field) != input.value:
                     setattr(rename.name_obj, rename.rename_field, input.value)
-            elif rename.rename_type == RenameType.TEXT_COMMAND:
-                if app_.executeTextCommand(f'PInterfaces.GetUserName {rename.name_obj}') != input.value:
-                    # The text command does not handle quotes
-                    new_name = input.value.replace('"', '')
-                    app_.executeTextCommand(f'PInterfaces.Rename {rename.name_obj} "{new_name}"')
-            else:
-                raise Exception(f"Unknown rename type: {rename.rename_type}")
-        except RuntimeError as e:
-            failures.append((rename.name_obj.name, input.value))
-            error_info = str(e)
-            error_split = error_info.split(' : ', maxsplit=1)
-            if len(error_split) == 2:
-                error_info = error_split[1]
+            except RuntimeError as e:
+                failures.append((rename.name_obj.name, input.value))
+                error_info = str(e)
+                error_split = error_info.split(' : ', maxsplit=1)
+                if len(error_split) == 2:
+                    error_info = error_split[1]
+        elif isinstance(rename, TextCmdRenameInfo):
+            if app_.executeTextCommand(f'PInterfaces.GetUserName {rename.entity_id}') != input.value:
+                # The text command does not handle quotes - not even `\`-escaped.
+                new_name = input.value.replace('"', '')
+                app_.executeTextCommand(f'PInterfaces.Rename {rename.entity_id} "{new_name}"')
+        else:
+            raise Exception(f"Unknown rename type: {type(rename)}")
     
     return failures
 
