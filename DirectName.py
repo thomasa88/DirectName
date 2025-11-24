@@ -220,6 +220,8 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     # that we get the terminated event first (registered last?), so we block
     # the next command.
     # Therefore, let's put ourselves at the end of the event queue.
+    if get_troubleshoot():
+        log(f"Scheduling terminate handler for command: {args.commandId}")
     events_manager_.delay(lambda: after_terminate_handler(args.commandId))
 
 def after_terminate_handler(command_id: str):
@@ -228,6 +230,8 @@ def after_terminate_handler(command_id: str):
     # Check that the user is not active in another command
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
         if command_id == 'FusionHalfSectionViewCommand':
+            if get_troubleshoot():
+                log("Scanning for unnamed section view")
             child_count = int(app_.executeTextCommand('Managed.Children VisualAnalyses'))
             # Most likely the last child is the new one(?)
             for i in range(child_count - 1, -1, -1):
@@ -240,15 +244,21 @@ def after_terminate_handler(command_id: str):
                     if settings_['nameSections']:
                         rename_info = TextCmdRenameInfo("Section", entity_id)
                         rename_objs_ = [ rename_info ]
+                        if get_troubleshoot():
+                            labels = [o.label for o in rename_objs_]
+                            log(f"Opening rename dialog for: {labels}")
                         rename_cmd_def_.execute()
                     break
         else:
             if get_troubleshoot():
-                log("Scanning timeline")
+                log("Scanning timeline. Reason: command terminated: " + command_id)
             rename_objs_ = check_timeline(trigger_cmd_id=command_id)
             if get_troubleshoot():
-                log("Timeline scan complete")
+                labels = [o.label for o in rename_objs_]
+                log(f"Timeline scan complete. To rename: {labels}")
             if rename_objs_:
+                if get_troubleshoot():
+                    log(f"Opening rename dialog for: {labels}")
                 rename_cmd_def_.execute()
 
 def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
@@ -262,6 +272,9 @@ def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
     # User can expand/collapse the timeline groups without us knowing,
     # and it affects the timeline API structure, so get a flat timeline.
     current_flat_timeline = thomasa88lib.timeline.flatten_timeline(timeline)
+    
+    if get_troubleshoot():
+        log(f"Timeline: {[obj.name for obj in current_flat_timeline]}")
 
     if not init:
         # Doing Undo (Ctrl+Z) goes by unnoticed, so we can't rely on length
@@ -280,6 +293,9 @@ def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
             index = next_index
             last_new_obj = next_obj
         
+        if get_troubleshoot():
+            log(f"Last new object: {last_new_obj.name if last_new_obj else 'None'} at index {index}")
+        
         if last_new_obj:
             # The user cannot name two timeline objects the same thing, but they
             # can do create, undo, create and get a new object with the exact
@@ -297,6 +313,9 @@ def check_timeline(init=False, trigger_cmd_id=None) -> list[RenameInfo]:
                 if is_old:
                     break
                 new_objs.append(obj)
+            
+            if get_troubleshoot():
+                log(f"Candidate new objects: {[obj.name for obj in new_objs]}")
 
             if new_objs:
                 # Creation order
