@@ -1,6 +1,8 @@
 .vscode
 16x16-disabled.png
 32x32-disabled.png
+16x16-normal.png
+32x32-normal.png
 release
 /settings.json
 .env
