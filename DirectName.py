@@ -112,7 +112,8 @@ need_init_ = True
 last_flat_timeline_ = None
 rename_cmd_def_ = None
 enable_cmd_def_ = None
-rename_objs_: list[RenameInfo] = None
+detected_rename_objs_: list[RenameInfo] = []
+dialog_rename_objs_: list[RenameInfo] = []
 command_terminated_handler_info_ = None
 panel_: adsk.core.ToolbarPanel = None
 # These often hit settings are loaded into bools to avoid degrading Fusion's performance
@@ -226,7 +227,7 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
 
 def after_terminate_handler(command_id: str):
     global need_init_
-    global rename_objs_
+    global detected_rename_objs_
     # Check that the user is not active in another command
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
         if command_id == 'FusionHalfSectionViewCommand':
@@ -243,20 +244,21 @@ def after_terminate_handler(command_id: str):
                 if section_properties['userName'] == '':
                     if settings_['nameSections']:
                         rename_info = TextCmdRenameInfo("Section", entity_id)
-                        rename_objs_ = [ rename_info ]
+                        detected_rename_objs_.append(rename_info)
                         if get_troubleshoot():
-                            labels = [o.label for o in rename_objs_]
+                            labels = [o.label for o in detected_rename_objs_]
                             log(f"Opening rename dialog for: {labels}")
                         rename_cmd_def_.execute()
                     break
         else:
             if get_troubleshoot():
                 log("Scanning timeline. Reason: command terminated: " + command_id)
-            rename_objs_ = check_timeline(trigger_cmd_id=command_id)
+            # TODO: Use an ordered set (dict?) to avoid duplicates?
+            detected_rename_objs_ += check_timeline(trigger_cmd_id=command_id)
             if get_troubleshoot():
-                labels = [o.label for o in rename_objs_]
+                labels = [o.label for o in detected_rename_objs_]
                 log(f"Timeline scan complete. To rename: {labels}")
-            if rename_objs_:
+            if detected_rename_objs_:
                 if get_troubleshoot():
                     log(f"Opening rename dialog for: {labels}")
                 rename_cmd_def_.execute()
@@ -381,6 +383,13 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     # The nifty thing with cast is that code completion then knows the object type
     cmd = adsk.core.Command.cast(args.command)
     
+    global dialog_rename_objs_
+    global detected_rename_objs_
+    # Take a snapshot of the detected objects, to avoid them being cleared by
+    # an extra scan before the dialog is opened. #21
+    dialog_rename_objs_ = detected_rename_objs_
+    detected_rename_objs_ = []
+    
     # Don't spam the right click shortcut menu
     cmd.isRepeatable = False
     # Don't save if the user goes on to another command
@@ -406,10 +415,10 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
     # an input. Unfortunately, it does not trigger on focus change made by the keyboard.
     table = inputs.addTableCommandInput('table', '', 3, '8:12:1')
     table.tablePresentationStyle = adsk.core.TablePresentationStyles.transparentBackgroundTablePresentationStyle
-    table.minimumVisibleRows = min(len(rename_objs_), 1)
+    table.minimumVisibleRows = min(len(dialog_rename_objs_), 1)
     table.maximumVisibleRows = 20
 
-    for i, rename in enumerate(rename_objs_):
+    for i, rename in enumerate(dialog_rename_objs_):
         label_input = table.commandInputs.addStringValueInput(f'label_{i}', '', rename.label)
         label_input.isReadOnly = True
         if isinstance(rename, ApiRenameInfo):
@@ -431,7 +440,7 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
         string_input = table.commandInputs.addStringValueInput(f'string_{i}', rename.label, obj_name)
         table.addCommandInput(label_input, i, 0)
         table.addCommandInput(string_input, i, 1)
-        if i < len(rename_objs_) - 1:
+        if i < len(dialog_rename_objs_) - 1:
             copy_btn = table.commandInputs.addBoolValueInput(f'copy_{i}', "Copy down", False, './resources/copy_down')
             table.addCommandInput(copy_btn, i, 2)
 
@@ -490,7 +499,7 @@ def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
         skip_one = not skip_one
         src_idx = int(idx_str)
         src_text = args.inputs.itemById(f'string_{src_idx}').value
-        for i in range(src_idx + 1, len(rename_objs_)):
+        for i in range(src_idx + 1, len(dialog_rename_objs_)):
             args.inputs.itemById(f'string_{i}').value = src_text
         # Focus the first text box to which data was copied to,
         # in case the user wants to edit the value to have almost the same name.
@@ -514,7 +523,7 @@ def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
 def try_rename_objects(inputs):
     failures = []
 
-    for i, rename in enumerate(rename_objs_):
+    for i, rename in enumerate(dialog_rename_objs_):
         input = inputs.itemById(f'string_{i}')
         if isinstance(rename, ApiRenameInfo):
             try:
