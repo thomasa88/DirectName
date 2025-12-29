@@ -119,6 +119,7 @@ panel_: adsk.core.ToolbarPanel = None
 # These often hit settings are loaded into bools to avoid degrading Fusion's performance
 enabled_: bool
 troubleshoot_: bool
+dialog_is_open_ = False
 
 def set_enabled(value):
     global enabled_
@@ -251,6 +252,10 @@ def after_terminate_handler(command_id: str):
                         rename_cmd_def_.execute()
                     break
         else:
+            if dialog_is_open_:
+                if get_troubleshoot():
+                    log("Rename dialog is already open, skipping scan.")
+                return
             if get_troubleshoot():
                 log("Scanning timeline. Reason: command terminated: " + command_id)
             # TODO: Use an ordered set (dict?) to avoid duplicates?
@@ -465,6 +470,9 @@ def press_key(key_code, times=1):
     return ok
 
 def rename_command_execute_handler(args: adsk.core.CommandEventArgs):
+    global dialog_is_open_
+    dialog_is_open_ = True
+    
     cmd = args.command
     inputs = cmd.commandInputs
 
@@ -517,6 +525,8 @@ def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
             press_key(key_code=thomasa88lib.win.input.VK_RIGHT)
 
 def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
+    global dialog_is_open_
+    dialog_is_open_ = False
     # Update state
     check_timeline(init=True)
 
