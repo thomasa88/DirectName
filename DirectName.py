@@ -170,6 +170,8 @@ def stop_monitoring():
     global command_terminated_handler_info_
     if command_terminated_handler_info_:
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
+    # Don't keep detected objects if switching documents
+    detected_rename_objs_.clear()
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     if get_troubleshoot():
