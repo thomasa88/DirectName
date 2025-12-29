@@ -118,6 +118,7 @@ command_terminated_handler_info_ = None
 panel_: adsk.core.ToolbarPanel = None
 # These often hit settings are loaded into bools to avoid degrading Fusion's performance
 enabled_: bool
+# Use accessor function for troubleshoot_
 troubleshoot_: bool
 dialog_is_open_ = False
 
@@ -161,12 +162,16 @@ def workspace_pre_deactivate_handler(args: adsk.core.WorkspaceEventArgs):
     stop_monitoring()
 
 def start_monitoring():
+    if get_troubleshoot():
+        log("Starting command monitoring")
     global command_terminated_handler_info_
     if not command_terminated_handler_info_:
         command_terminated_handler_info_ = events_manager_.add_handler(ui_.commandTerminated,
                                             callback=command_terminated_handler)
 
 def stop_monitoring():
+    if get_troubleshoot():
+        log("Stopping command monitoring")
     global command_terminated_handler_info_
     if command_terminated_handler_info_:
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
@@ -433,7 +438,10 @@ def rename_command_created_handler(args: adsk.core.CommandCreatedEventArgs):
         elif isinstance(rename, TextCmdRenameInfo):
             obj_name = app_.executeTextCommand(f'PInterfaces.GetUserName {rename.entity_id}')
         else:
+            log(f"Dialog: Unknown rename type: {type(rename)}")
             raise Exception(f"Unknown rename type: {type(rename)}")
+        if get_troubleshoot():
+            log(f"Dialog: Add '{obj_name}'")
 
         if isinstance(rename, ApiRenameInfo):
             if settings_['nameBodies'] and settings_['bodyInheritName']:
@@ -529,6 +537,8 @@ def rename_command_input_changed_handler(args: adsk.core.InputChangedEventArgs):
 def rename_command_destroy_handler(args: adsk.core.CommandEventArgs):
     global dialog_is_open_
     dialog_is_open_ = False
+    if get_troubleshoot():
+        log("Rename dialog closed")
     # Update state
     check_timeline(init=True)
 
