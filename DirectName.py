@@ -121,6 +121,7 @@ enabled_: bool
 # Use accessor function for troubleshoot_
 troubleshoot_: bool
 dialog_is_open_ = False
+scan_is_scheduled_ = False
 
 def set_enabled(value):
     global enabled_
@@ -177,6 +178,8 @@ def stop_monitoring():
         command_terminated_handler_info_ = events_manager_.remove_handler(command_terminated_handler_info_)
     # Don't keep detected objects if switching documents
     detected_rename_objs_.clear()
+    global scan_is_scheduled_
+    scan_is_scheduled_ = False
 
 def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     if get_troubleshoot():
@@ -229,13 +232,20 @@ def command_terminated_handler(args: adsk.core.ApplicationCommandEventArgs):
     # that we get the terminated event first (registered last?), so we block
     # the next command.
     # Therefore, let's put ourselves at the end of the event queue.
-    if get_troubleshoot():
-        log(f"Scheduling terminate handler for command: {args.commandId}")
-    events_manager_.delay(lambda: after_terminate_handler(args.commandId))
+    global scan_is_scheduled_
+    if not scan_is_scheduled_:
+        if get_troubleshoot():
+            log(f"Scheduling terminate handler for command: {args.commandId}")
+        scan_is_scheduled_ = True
+        events_manager_.delay(lambda: after_terminate_handler(args.commandId))
+    elif get_troubleshoot():
+        log(f"Scan already scheduled, skipping to schedule for: {args.commandId}")
 
 def after_terminate_handler(command_id: str):
     global need_init_
     global detected_rename_objs_
+    global scan_is_scheduled_
+    scan_is_scheduled_ = False
     # Check that the user is not active in another command
     if not ui_.activeCommand or ui_.activeCommand == 'SelectCommand':
         if command_id == 'FusionHalfSectionViewCommand':
