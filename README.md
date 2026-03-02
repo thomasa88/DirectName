@@ -60,6 +60,9 @@ This project is licensed under the terms of the MIT license. See [LICENSE](LICEN
 
 ## Changelog
 
+* v 1.5.0 (March 2026)
+  * Fix DirectName missing updates (after auto-save). #21
+  * Much more detailed logging in troubleshooting mode.
 * v 1.4.3 (May 2025)
   * Fix add-in not starting in Fusion Insider. #18
   * Fix error when exiting Fusion. #19
